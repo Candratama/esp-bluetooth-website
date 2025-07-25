@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speeduino INI Parser</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Simple scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748; /* gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #718096; /* gray-500 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0; /* gray-400 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Speeduino .ini Config Parser</h1>
+            <p class="text-lg text-gray-600 mt-2">Tempelkan konten file `.ini` Anda di bawah ini dan klik "Parse" untuk melihat hasilnya dalam format JSON.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Input Area -->
+            <div class="bg-white p-6 rounded-xl shadow-lg">
+                <h2 class="text-2xl font-semibold mb-4">Input Konfigurasi (.ini)</h2>
+                <textarea id="iniInput" class="w-full h-96 md:h-[600px] p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Tempelkan konten file .ini di sini..."></textarea>
+                <button id="parseButton" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out">
+                    Parse Konfigurasi
+                </button>
+            </div>
+
+            <!-- Output Area -->
+            <div class="bg-gray-800 text-white p-6 rounded-xl shadow-lg flex flex-col">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-gray-100">Output Terstruktur (JSON)</h2>
+                    <button id="copyButton" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500 transition duration-300 ease-in-out text-sm">
+                        Copy JSON
+                    </button>
+                </div>
+                 <div id="spinner" class="hidden text-center py-10">
+                    <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="mt-2">Parsing...</p>
+                </div>
+                <pre id="jsonOutput" class="flex-grow w-full h-96 md:h-[600px] p-4 bg-gray-900 border border-gray-700 rounded-lg overflow-auto text-sm font-mono"></pre>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ===================================================================================
+        // Speeduino INI Parser Logic
+        // ===================================================================================
+        class SpeeduinoIniParser {
+            constructor() {
+                this.defines = {};
+                this.config = {};
+                // Preprocessor flags. Hardcoded for simplicity. A real app would let the user choose.
+                this.flags = {
+                    'LAMBDA': false,
+                    'CELSIUS': true,
+                    'mcu_stm32': false,
+                    'mcu_teensy': false,
+                    'COMMS_COMPAT': false,
+                    'resetcontrol_adv': false,
+                    'MSDROID_COMPAT': false,
+                    'enablehardware_test': false,
+                    'pressure_bar': false
+                };
+            }
+
+            /**
+             * Main parsing function.
+             * @param {string} iniString - The raw string content of the .ini file.
+             * @returns {object} The parsed configuration object.
+             */
+            parse(iniString) {
+                this.defines = {};
+                this.config = {};
+
+                const lines = iniString.split(/\r?\n/);
+
+                // --- Pass 1: Handle preprocessor directives (#define, #if, etc.) ---
+                const processedLines = this.preprocess(lines);
+                
+                // --- Pass 2: Main parsing loop ---
+                let currentSection = null;
+                let currentPage = null;
+                let currentGroup = null;
+
+                for (const line of processedLines) {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine || trimmedLine.startsWith(';') || trimmedLine.startsWith('//')) {
+                        continue;
+                    }
+
+                    // Match [SectionName]
+                    const sectionMatch = trimmedLine.match(/^\[(.+)\]$/);
+                    if (sectionMatch) {
+                        currentSection = sectionMatch[1];
+                        currentPage = null; // Reset page on new section
+                        currentGroup = null; // Reset group on new section
+                        this.config[currentSection] = this.config[currentSection] || {};
+                        if (currentSection === 'Constants') {
+                            this.config.Constants.pages = {};
+                        }
+                        continue;
+                    }
+
+                    // Match page = X
+                    const pageMatch = trimmedLine.match(/^page\s*=\s*(\d+)/i);
+                    if (pageMatch && currentSection === 'Constants') {
+                        currentPage = pageMatch[1];
+                        this.config.Constants.pages[currentPage] = this.config.Constants.pages[currentPage] || {};
+                        continue;
+                    }
+
+                    // Match key = value
+                    const varMatch = trimmedLine.match(/^([\w\.]+)\s*=\s*(.+)$/);
+                    if (varMatch && currentSection) {
+                        const key = varMatch[1];
+                        let value = varMatch[2].trim();
+
+                        // Handle specific section parsing logic
+                        if (currentSection === 'SettingGroups') {
+                            if (key === 'settingGroup') {
+                                const [name, displayName] = value.split(',').map(s => s.trim().replace(/"/g, ''));
+                                currentGroup = name;
+                                this.config.SettingGroups[currentGroup] = { displayName, options: {} };
+                            } else if (key === 'settingOption' && currentGroup) {
+                                const [name, displayName] = value.split(',').map(s => s.trim().replace(/"/g, ''));
+                                this.config.SettingGroups[currentGroup].options[name] = displayName;
+                            }
+                        } else {
+                            const parsedValue = this.parseLine(key, value);
+                            if (currentSection === 'Constants' && currentPage) {
+                                this.config.Constants.pages[currentPage][key] = parsedValue;
+                            } else {
+                                this.config[currentSection][key] = parsedValue;
+                            }
+                        }
+                    }
+                }
+
+                return this.config;
+            }
+
+            /**
+             * Preprocesses lines to handle #define and #if/#else/#endif directives.
+             * @param {string[]} lines - Array of raw lines from the file.
+             * @returns {string[]} Array of processed lines.
+             */
+            preprocess(lines) {
+                // --- BUG FIX START ---
+                // The original logic processed defines sequentially, which failed for nested defines.
+                // The new logic first collects all defines, then iteratively resolves them until no more substitutions can be made.
+
+                // 1. Collect all raw #define statements
+                const defines = {};
+                for (const line of lines) {
+                    const trimmedLine = line.trim();
+                    const defineMatch = trimmedLine.match(/^#define\s+([\w$]+)\s*=\s*(.+)$/);
+                    if (defineMatch) {
+                        defines[defineMatch[1]] = defineMatch[2].trim();
+                    }
+                }
+
+                // 2. Iteratively substitute defines within other defines
+                let substitutionsMade = true;
+                let iterations = 0;
+                while (substitutionsMade && iterations < 15) { // Safety break for infinite loops
+                    substitutionsMade = false;
+                    for (const key in defines) {
+                        if (defines[key].includes('$')) {
+                            for (const subKey in defines) {
+                                if (key !== subKey) {
+                                    const regex = new RegExp(`\\$${subKey}`, 'g');
+                                    const newValue = defines[key].replace(regex, defines[subKey]);
+                                    if (newValue !== defines[key]) {
+                                        defines[key] = newValue;
+                                        substitutionsMade = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    iterations++;
+                }
+                this.defines = defines;
+                // --- BUG FIX END ---
+
+                // 3. Process all lines with fully resolved defines and conditional blocks
+                let processed = [];
+                const ifStack = [];
+
+                for (const line of lines) {
+                    let trimmedLine = line.trim();
+                    
+                    if (trimmedLine.startsWith('#if')) {
+                        const condition = trimmedLine.substring(4).trim();
+                        ifStack.push(this.flags[condition] || false);
+                        continue;
+                    }
+                    
+                    if (trimmedLine.startsWith('#else')) {
+                        if (ifStack.length > 0) {
+                            ifStack[ifStack.length - 1] = !ifStack[ifStack.length - 1];
+                        }
+                        continue;
+                    }
+
+                    if (trimmedLine.startsWith('#endif')) {
+                        ifStack.pop();
+                        continue;
+                    }
+
+                    // If we are inside a false #if block, skip the line
+                    if (ifStack.some(v => !v)) {
+                        continue;
+                    }
+
+                    // Skip #define lines now as they are fully processed
+                    if (trimmedLine.startsWith('#define') || trimmedLine.startsWith('#unset')) {
+                        continue;
+                    }
+
+                    // Substitute any remaining defines (should be none, but for safety)
+                    for(const defKey in this.defines) {
+                        trimmedLine = trimmedLine.replace(new RegExp(`\\$${defKey}`, 'g'), this.defines[defKey]);
+                    }
+                   
+                    processed.push(trimmedLine);
+                }
+                
+                return processed;
+            }
+
+            /**
+             * Parses a single "key = value" line into a structured object.
+             * @param {string} key - The key of the variable.
+             * @param {string} valueString - The value string to parse.
+             * @returns {object|string} A structured object or the original string if not parsable.
+             */
+            parseLine(key, valueString) {
+                // Split by comma, but not inside quotes
+                const parts = valueString.match(/(?:[^,"]+|"[^"]*")+/g).map(p => p.trim());
+                const type = parts[0];
+
+                try {
+                    switch (type) {
+                        case 'scalar':
+                            return this.parseScalar(parts);
+                        case 'array':
+                            return this.parseArray(parts);
+                        case 'bits':
+                            return this.parseBits(parts);
+                        case 'string':
+                            return { type: 'string', class: parts[1], length: parseInt(parts[2]) };
+                        default:
+                            // Handle simple key = value pairs
+                            if (parts.length === 1 && !valueString.includes(',')) {
+                                return valueString.replace(/"/g, '');
+                            }
+                            // Handle comma-separated lists
+                            return valueString.split(',').map(s => s.trim().replace(/"/g, ''));
+                    }
+                } catch (e) {
+                    console.warn(`Could not parse line: ${key} = ${valueString}`, e);
+                    return valueString; // Return as raw string on failure
+                }
+            }
+            
+            parseScalar(parts) {
+                const obj = { type: 'scalar', class: parts[1], offset: parseInt(parts[2]) };
+                let currentIndex = 3;
+                obj.units = parts[currentIndex++].replace(/"/g, '');
+                obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
+                return obj;
+            }
+
+            parseArray(parts) {
+                const obj = { type: 'array', class: parts[1], offset: parseInt(parts[2]) };
+                let currentIndex = 3;
+                const shapeMatch = parts[currentIndex++].match(/\[(\d+)(?:x(\d+))?\]/);
+                if (shapeMatch) {
+                    obj.shape = [parseInt(shapeMatch[1])];
+                    if (shapeMatch[2]) obj.shape.push(parseInt(shapeMatch[2]));
+                }
+                obj.units = parts[currentIndex++].replace(/"/g, '');
+                obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
+                obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
+                return obj;
+            }
+
+            parseBits(parts) {
+                const obj = { type: 'bits', class: parts[1] };
+                let currentIndex = 2;
+                // Offset might not exist for PcVariables
+                if (!parts[currentIndex].startsWith('[')) {
+                    obj.offset = parseInt(parts[currentIndex++]);
+                }
+                const bitMatch = parts[currentIndex++].match(/\[(\d+):(\d+)\]/);
+                if (bitMatch) {
+                    obj.startBit = parseInt(bitMatch[1]);
+                    obj.endBit = parseInt(bitMatch[2]);
+                }
+                obj.options = parts.slice(currentIndex).map(opt => opt.replace(/"/g, ''));
+                return obj;
+            }
+
+            parseNumberOrExpr(part) {
+                if (part === undefined) return null;
+                if (part.startsWith('{') && part.endsWith('}')) {
+                    return part; // Store expression as string
+                }
+                return parseFloat(part);
+            }
+        }
+
+        // ===================================================================================
+        // DOM Interaction
+        // ===================================================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const iniInput = document.getElementById('iniInput');
+            const parseButton = document.getElementById('parseButton');
+            const jsonOutput = document.getElementById('jsonOutput');
+            const spinner = document.getElementById('spinner');
+            const copyButton = document.getElementById('copyButton');
+
+            // Pre-fill the textarea with the provided config for convenience
+            fetch('https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini')
+                .then(response => response.text())
+                .then(text => {
+                    iniInput.value = text;
+                });
+
+            parseButton.addEventListener('click', () => {
+                const iniContent = iniInput.value;
+                if (!iniContent) {
+                    jsonOutput.textContent = 'Silakan tempelkan konten .ini terlebih dahulu.';
+                    return;
+                }
+
+                jsonOutput.textContent = '';
+                spinner.classList.remove('hidden');
+
+                // Use setTimeout to allow the UI to update and show the spinner
+                setTimeout(() => {
+                    try {
+                        const parser = new SpeeduinoIniParser();
+                        const config = parser.parse(iniContent);
+                        jsonOutput.textContent = JSON.stringify(config, null, 2);
+                    } catch (error) {
+                        jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
+                        console.error("Parsing Error:", error);
+                    } finally {
+                        spinner.classList.add('hidden');
+                    }
+                }, 50); // Small delay
+            });
+
+            // --- Copy Button Logic ---
+            copyButton.addEventListener('click', () => {
+                const jsonText = jsonOutput.textContent;
+                if (jsonText && jsonText.trim().length > 0 && !jsonText.startsWith('Silakan')) {
+                    // Using navigator.clipboard for modern browsers
+                    navigator.clipboard.writeText(jsonText).then(() => {
+                        showCopySuccess();
+                    }).catch(err => {
+                        console.warn('Async clipboard API failed, trying fallback:', err);
+                        // Fallback for older browsers or insecure contexts (like http)
+                        try {
+                            const textArea = document.createElement("textarea");
+                            textArea.value = jsonText;
+                            textArea.style.position = "fixed"; // Avoid scrolling to bottom
+                            textArea.style.top = "0";
+                            textArea.style.left = "0";
+                            textArea.style.opacity = "0";
+                            document.body.appendChild(textArea);
+                            textArea.focus();
+                            textArea.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(textArea);
+                            showCopySuccess();
+                        } catch (fallbackErr) {
+                            console.error('Fallback copy method failed:', fallbackErr);
+                            // If all else fails, you can show a message to the user.
+                            // I'm avoiding alert() as per instructions.
+                            copyButton.textContent = 'Gagal Menyalin!';
+                            copyButton.classList.add('bg-red-600');
+                            setTimeout(() => {
+                                copyButton.textContent = 'Copy JSON';
+                                copyButton.classList.remove('bg-red-600');
+                            }, 2000);
+                        }
+                    });
+                }
+            });
+
+            function showCopySuccess() {
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'Disalin!';
+                copyButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                copyButton.classList.remove('bg-gray-600', 'hover:bg-gray-500');
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                    copyButton.classList.remove('bg-green-600', 'hover:bg-green-700');
+                    copyButton.classList.add('bg-gray-600', 'hover:bg-gray-500');
+                }, 2000);
+            }
+
+        });
+    </script>
+</body>
+</html>
