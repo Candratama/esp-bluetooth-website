@@ -86,6 +86,21 @@
                     'pressure_bar': false
                 };
             }
+            
+            /**
+             * Splits a string by a delimiter, but respects quoted sections.
+             * @param {string} str The string to split.
+             * @param {string} delimiter The delimiter character.
+             * @returns {string[]} An array of strings.
+             */
+            splitRespectingQuotes(str, delimiter = ',') {
+                // This regex splits by the delimiter, but treats quoted strings ("...") 
+                // and curly brace blocks ({...}) as single, atomic units.
+                return str.match(new RegExp(`(?:[^{"${delimiter}]+|\\{[^}]*\\}|"[^"]*")+`, 'g'))
+                    .map(p => p.trim())
+                    .filter(p => p.length > 0);
+            }
+
 
             /**
              * Main parsing function.
@@ -98,13 +113,14 @@
 
                 const lines = iniString.split(/\r?\n/);
 
-                // --- Pass 1: Handle preprocessor directives (#define, #if, etc.) ---
                 const processedLines = this.preprocess(lines);
                 
-                // --- Pass 2: Main parsing loop ---
                 let currentSection = null;
                 let currentPage = null;
                 let currentGroup = null;
+                let currentMenuDialog = null;
+                let currentMenu = null;
+                let currentGroupMenu = null;
 
                 for (const line of processedLines) {
                     const trimmedLine = line.trim();
@@ -112,20 +128,31 @@
                         continue;
                     }
 
-                    // Match [SectionName]
                     const sectionMatch = trimmedLine.match(/^\[(.+)\]$/);
                     if (sectionMatch) {
                         currentSection = sectionMatch[1];
-                        currentPage = null; // Reset page on new section
-                        currentGroup = null; // Reset group on new section
-                        this.config[currentSection] = this.config[currentSection] || {};
-                        if (currentSection === 'Constants') {
-                            this.config.Constants.pages = {};
+                        currentPage = null;
+                        currentGroup = null;
+                        currentMenuDialog = null;
+                        currentMenu = null;
+                        currentGroupMenu = null;
+
+                        if (currentSection === 'ConstantsExtensions') {
+                            this.config.ConstantsExtensions = {
+                                requiresPowerCycle: [],
+                                defaultValue: {},
+                                controllerPriority: []
+                            };
+                        } else if (currentSection === 'Menu') {
+                            this.config.Menu = {};
+                        } else if (currentSection === 'Constants') {
+                            this.config.Constants = { pages: {} };
+                        } else {
+                            this.config[currentSection] = this.config[currentSection] || {};
                         }
                         continue;
                     }
 
-                    // Match page = X
                     const pageMatch = trimmedLine.match(/^page\s*=\s*(\d+)/i);
                     if (pageMatch && currentSection === 'Constants') {
                         currentPage = pageMatch[1];
@@ -133,21 +160,32 @@
                         continue;
                     }
 
-                    // Match key = value
                     const varMatch = trimmedLine.match(/^([\w\.]+)\s*=\s*(.+)$/);
                     if (varMatch && currentSection) {
                         const key = varMatch[1];
                         let value = varMatch[2].trim();
 
-                        // Handle specific section parsing logic
-                        if (currentSection === 'SettingGroups') {
+                        if (currentSection === 'ConstantsExtensions') {
+                            if (key === 'requiresPowerCycle') {
+                                this.config.ConstantsExtensions.requiresPowerCycle.push(value);
+                            } else if (key === 'defaultValue') {
+                                const [defKey, ...defValParts] = this.splitRespectingQuotes(value);
+                                this.config.ConstantsExtensions.defaultValue[defKey] = defValParts.join(', ').replace(/^"|"$/g, '');
+                            } else if (key === 'controllerPriority') {
+                                this.config.ConstantsExtensions.controllerPriority.push(value);
+                            } else {
+                                this.config.ConstantsExtensions[key] = this.parseLine(key, value);
+                            }
+                        } else if (currentSection === 'Menu') {
+                            this.handleMenuParsing(key, value);
+                        } else if (currentSection === 'SettingGroups') {
                             if (key === 'settingGroup') {
-                                const [name, displayName] = value.split(',').map(s => s.trim().replace(/"/g, ''));
+                                const [name, displayName] = this.splitRespectingQuotes(value);
                                 currentGroup = name;
-                                this.config.SettingGroups[currentGroup] = { displayName, options: {} };
+                                this.config.SettingGroups[currentGroup] = { displayName: displayName.replace(/"/g, ''), options: {} };
                             } else if (key === 'settingOption' && currentGroup) {
-                                const [name, displayName] = value.split(',').map(s => s.trim().replace(/"/g, ''));
-                                this.config.SettingGroups[currentGroup].options[name] = displayName;
+                                const [name, displayName] = this.splitRespectingQuotes(value);
+                                this.config.SettingGroups[currentGroup].options[name] = displayName.replace(/"/g, '');
                             }
                         } else {
                             const parsedValue = this.parseLine(key, value);
@@ -162,14 +200,49 @@
 
                 return this.config;
             }
+            
+            handleMenuParsing(key, value) {
+                const parts = this.splitRespectingQuotes(value);
+                switch(key) {
+                    case 'menuDialog':
+                        this.currentMenuDialog = value;
+                        this.config.Menu[this.currentMenuDialog] = this.config.Menu[this.currentMenuDialog] || [];
+                        this.currentMenu = null;
+                        this.currentGroupMenu = null;
+                        break;
+                    case 'menu':
+                        if (!this.currentMenuDialog) break;
+                        this.currentMenu = { type: 'menu', label: value.replace(/"/g, ''), items: [] };
+                        this.config.Menu[this.currentMenuDialog].push(this.currentMenu);
+                        this.currentGroupMenu = null;
+                        break;
+                    case 'subMenu':
+                        if (!this.currentMenu) break;
+                        if (parts[0] === 'std_separator') {
+                            this.currentMenu.items.push({ type: 'separator' });
+                        } else {
+                            const item = { type: 'item', id: parts[0], label: parts[1].replace(/"/g, '') };
+                            if (parts[2]) item.value = isNaN(parts[2]) ? parts[2] : parseInt(parts[2], 10);
+                            if (parts[3]) item.condition = parts[3];
+                            this.currentMenu.items.push(item);
+                        }
+                        break;
+                    case 'groupMenu':
+                        if (!this.currentMenu) break;
+                        this.currentGroupMenu = { type: 'group', label: value.replace(/"/g, ''), items: [] };
+                        this.currentMenu.items.push(this.currentGroupMenu);
+                        break;
+                    case 'groupChildMenu':
+                        if (!this.currentGroupMenu) break;
+                        const childItem = { type: 'item', id: parts[0], label: parts[1].replace(/"/g, '') };
+                        if (parts[2]) childItem.value = isNaN(parts[2]) ? parts[2] : parseInt(parts[2], 10);
+                        if (parts[3]) childItem.condition = parts[3];
+                        this.currentGroupMenu.items.push(childItem);
+                        break;
+                }
+            }
 
-            /**
-             * Preprocesses lines to handle #define and #if/#else/#endif directives.
-             * @param {string[]} lines - Array of raw lines from the file.
-             * @returns {string[]} Array of processed lines.
-             */
             preprocess(lines) {
-                // 1. Collect all raw #define statements
                 const defines = {};
                 for (const line of lines) {
                     const trimmedLine = line.trim();
@@ -179,10 +252,9 @@
                     }
                 }
 
-                // 2. Iteratively substitute defines within other defines
                 let substitutionsMade = true;
                 let iterations = 0;
-                while (substitutionsMade && iterations < 15) { // Safety break for infinite loops
+                while (substitutionsMade && iterations < 15) {
                     substitutionsMade = false;
                     for (const key in defines) {
                         if (defines[key].includes('$')) {
@@ -202,7 +274,6 @@
                 }
                 this.defines = defines;
 
-                // 3. Process all lines with fully resolved defines and conditional blocks
                 let processed = [];
                 const ifStack = [];
 
@@ -227,17 +298,14 @@
                         continue;
                     }
 
-                    // If we are inside a false #if block, skip the line
                     if (ifStack.some(v => !v)) {
                         continue;
                     }
 
-                    // Skip #define lines now as they are fully processed
                     if (trimmedLine.startsWith('#define') || trimmedLine.startsWith('#unset')) {
                         continue;
                     }
 
-                    // Substitute any remaining defines (should be none, but for safety)
                     for(const defKey in this.defines) {
                         trimmedLine = trimmedLine.replace(new RegExp(`\\$${defKey}`, 'g'), this.defines[defKey]);
                     }
@@ -248,19 +316,8 @@
                 return processed;
             }
 
-            /**
-             * Parses a single "key = value" line into a structured object.
-             * @param {string} key - The key of the variable.
-             * @param {string} valueString - The value string to parse.
-             * @returns {object|string} A structured object or the original string if not parsable.
-             */
             parseLine(key, valueString) {
-                // This regex splits by commas, but treats quoted strings ("...") 
-                // and curly brace blocks ({...}) as single, atomic units.
-                const parts = valueString.match(/(?:[^{",]+|\{[^}]*\}|"[^"]*")+/g)
-                    .map(p => p.trim())
-                    .filter(p => p.length > 0);
-                
+                const parts = this.splitRespectingQuotes(valueString);
                 const type = parts[0];
 
                 try {
@@ -274,10 +331,10 @@
                         case 'string':
                             return { type: 'string', class: parts[1], length: parseInt(parts[2]) };
                         default:
-                            if (parts.length === 1 && !valueString.includes(',')) {
-                                return valueString.replace(/"/g, '');
+                            if (parts.length === 1) {
+                                return parts[0].replace(/^"|"$/g, '');
                             }
-                            return valueString.split(',').map(s => s.trim().replace(/"/g, ''));
+                            return parts.map(s => s.trim().replace(/"/g, ''));
                     }
                 } catch (e) {
                     console.warn(`Could not parse line: ${key} = ${valueString}`, e);
@@ -301,24 +358,19 @@
                 const obj = { type: 'array', class: parts[1], offset: parseInt(parts[2]) };
                 let currentIndex = 3;
                 
-                // --- MODIFICATION START ---
-                // Regex to capture one or two numbers inside brackets, separated by 'x'
                 const shapeMatch = parts[currentIndex++].trim().match(/\[\s*(\d+)(?:\s*x\s*(\d+))?\s*\]/);
                 if (shapeMatch) {
                     const dim1 = parseInt(shapeMatch[1]);
                     const dim2 = shapeMatch[2] ? parseInt(shapeMatch[2]) : null;
 
                     if (dim2 !== null) {
-                        // It's a 2D array like [16x16]
                         obj.shape = { rows: dim1, columns: dim2 };
                     } else {
-                        // It's a 1D array like [16]
                         obj.shape = { length: dim1 };
                     }
                 } else {
-                    obj.shape = null; // Or handle error
+                    obj.shape = null;
                 }
-                // --- MODIFICATION END ---
 
                 obj.units = parts[currentIndex++].replace(/"/g, '');
                 obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
