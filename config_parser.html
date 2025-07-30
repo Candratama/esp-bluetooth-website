@@ -1,1051 +1,1336 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Speeduino INI Parser</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Simple scrollbar styling */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #2d3748; /* gray-800 */
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #718096; /* gray-500 */
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #a0aec0; /* gray-400 */
-        }
-        
-        /* JSON Tree Styles */
-        .json-tree {
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        
-        .json-node {
-            margin: 2px 0;
-        }
-        
-        .json-toggle {
-            cursor: pointer;
-            user-select: none;
-            color: #9ca3af;
-            font-weight: bold;
-            display: inline-block;
-            width: 12px;
-            text-align: center;
-        }
-        
-        .json-toggle:hover {
-            color: #60a5fa;
-        }
-        
-        .json-key {
-            color: #8b5cf6;
-            font-weight: 500;
-        }
-        
-        .json-string {
-            color: #10b981;
-        }
-        
-        .json-number {
-            color: #f59e0b;
-        }
-        
-        .json-boolean {
-            color: #ef4444;
-        }
-        
-        .json-null {
-            color: #6b7280;
-            font-style: italic;
-        }
-        
-        .json-bracket {
-            color: #9ca3af;
-            font-weight: bold;
-        }
-        
-        .json-children {
-            margin-left: 20px;
-            border-left: 1px solid #374151;
-            padding-left: 8px;
-        }
-        
-        .json-children.collapsed {
-            display: none;
-        }
-        
-        .json-count {
-            color: #6b7280;
-            font-size: 11px;
-            margin-left: 5px;
-        }
+      body {
+        font-family: "Inter", sans-serif;
+      }
+      /* Simple scrollbar styling */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #f1f5f9; /* slate-100 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #94a3b8; /* slate-400 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #64748b; /* slate-500 */
+      }
+      /* Styling for JSON Tree View */
+      .json-viewer {
+        font-family: "Menlo", "Consolas", monospace;
+        font-size: 0.9em;
+        line-height: 1.6;
+      }
+      .json-viewer details {
+        padding-left: 1.5rem;
+        border-left: 1px solid #e2e8f0; /* slate-200 */
+      }
+      .json-viewer summary {
+        cursor: pointer;
+        display: block; /* Makes the whole line clickable */
+        outline: none;
+      }
+      .json-viewer summary:hover {
+        color: #2563eb;
+      }
+      .json-viewer .key {
+        color: #9d174d; /* Pink-700 */
+        font-weight: 600;
+      }
+      .json-viewer .string {
+        color: #16a34a; /* Green-600 */
+      }
+      .json-viewer .number {
+        color: #2563eb; /* Blue-600 */
+      }
+      .json-viewer .boolean,
+      .json-viewer .null {
+        color: #ca8a04; /* Yellow-600 */
+      }
+      .json-viewer .comment {
+        color: #64748b; /* Slate-500 */
+        font-style: italic;
+        margin-left: 1rem;
+      }
+      .json-viewer summary::marker {
+        color: #94a3b8; /* Slate-400 */
+      }
     </style>
-</head>
-<body class="bg-gray-100 text-gray-800">
+  </head>
+  <body class="bg-gray-100 text-gray-800">
+    <div class="container mx-auto p-4 md:p-8">
+      <header class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-gray-900">
+          Speeduino .ini Config Parser
+        </h1>
+        <p class="text-lg text-gray-600 mt-2">
+          Tempelkan konten file `.ini` Anda di bawah ini, atau unggah file
+          langsung dari komputer Anda.
+        </p>
+      </header>
 
-    <div class="mx-auto p-4 md:p-8 max-w-7xl lg:max-w-none lg:mx-8 xl:mx-12 2xl:mx-16">
-        <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-gray-900">Speeduino .ini Config Parser</h1>
-            <p class="text-lg text-gray-600 mt-2">Upload file `.ini` atau tempelkan kontennya secara manual, lalu klik "Parse" untuk melihat hasilnya dalam format JSON.</p>
-        </header>
+      <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Input Area -->
+        <div class="bg-white p-6 rounded-xl shadow-lg">
+          <h2 class="text-2xl font-semibold mb-4">Input Konfigurasi (.ini)</h2>
+          <textarea
+            id="iniInput"
+            class="w-full h-96 md:h-[600px] p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+            placeholder="Tempelkan konten file .ini di sini..."
+          ></textarea>
+          <!-- Hidden file input -->
+          <input type="file" id="fileInput" accept=".ini" class="hidden" />
+          <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              id="uploadButton"
+              class="w-full bg-gray-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-300 ease-in-out"
+            >
+              Unggah File .ini
+            </button>
+            <button
+              id="parseButton"
+              class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out"
+            >
+              Parse Konfigurasi
+            </button>
+          </div>
+        </div>
 
-        <main class="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            <!-- Input Area -->
-            <div class="bg-white p-6 rounded-xl shadow-lg lg:col-span-2">
-                <h2 class="text-2xl font-semibold mb-4">Input Konfigurasi (.ini)</h2>
-                
-                <!-- File Upload Section -->
-                <div class="mb-4 p-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-400 transition-colors">
-                    <div class="text-center">
-                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <div class="mt-4">
-                            <label for="fileInput" class="cursor-pointer">
-                                <span class="mt-2 block text-sm font-medium text-gray-900">
-                                    Drag & drop file .ini ke sini atau klik untuk memilih
-                                </span>
-                                <input id="fileInput" name="file-upload" type="file" class="sr-only" accept=".ini,.txt">
-                            </label>
-                            <p class="mt-1 text-xs text-gray-500">File .ini atau .txt hingga 10MB</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- OR Divider -->
-                <div class="relative my-4">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-300"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="px-2 bg-white text-gray-500">ATAU</span>
-                    </div>
-                </div>
-
-                <!-- Text Input Section -->
-                <div class="mb-4">
-                    <label for="iniInput" class="block text-sm font-medium text-gray-700 mb-2">
-                        Tempelkan konten file .ini secara manual:
-                    </label>
-                    <textarea id="iniInput" class="w-full h-96 md:h-[600px] lg:h-[700px] xl:h-[800px] p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition" placeholder="Tempelkan konten file .ini di sini..."></textarea>
-                </div>
-
-                <button id="parseButton" class="mt-4 w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out">
-                    Parse Konfigurasi
-                </button>
+        <!-- Output Area -->
+        <div
+          class="bg-white text-gray-800 p-6 rounded-xl shadow-lg flex flex-col"
+        >
+          <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <h2 class="text-2xl font-semibold text-gray-900">
+              Output Terstruktur (JSON Tree)
+            </h2>
+            <div class="flex items-center gap-2">
+              <button
+                id="expandButton"
+                class="bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Expand All
+              </button>
+              <button
+                id="collapseButton"
+                class="bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Collapse All
+              </button>
+              <button
+                id="copyButton"
+                class="bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-500 transition duration-300 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled
+              >
+                Copy JSON
+              </button>
             </div>
-
-            <!-- Output Area -->
-            <div class="bg-gray-800 text-white p-6 rounded-xl shadow-lg flex flex-col lg:col-span-3">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                    <h2 class="text-2xl font-semibold text-gray-100">Output Terstruktur (JSON)</h2>
-                    <div class="flex flex-wrap gap-2">
-                        <div class="flex bg-gray-700 rounded-lg p-1">
-                            <button id="treeViewBtn" class="px-3 py-1 text-sm font-medium rounded-md bg-gray-600 text-white transition-colors">
-                                Tree
-                            </button>
-                            <button id="rawViewBtn" class="px-3 py-1 text-sm font-medium rounded-md text-gray-300 hover:text-white transition-colors">
-                                Raw
-                            </button>
-                        </div>
-                        <button id="expandAllBtn" class="bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-gray-500 focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Expand All
-                        </button>
-                        <button id="collapseAllBtn" class="bg-gray-600 text-white font-semibold py-2 px-3 rounded-lg hover:bg-gray-500 focus:outline-none text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Collapse All
-                        </button>
-                        <button id="copyButton" class="bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500 transition duration-300 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                            Copy JSON
-                        </button>
-                    </div>
-                </div>
-                 <div id="spinner" class="hidden text-center py-10">
-                    <svg class="animate-spin h-8 w-8 text-white mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <p class="mt-2">Parsing...</p>
-                </div>
-                <div id="jsonOutput" class="flex-grow w-full h-96 md:h-[600px] lg:h-[700px] xl:h-[800px] p-4 bg-gray-900 border border-gray-700 rounded-lg overflow-auto text-sm"></div>
-            </div>
-        </main>
+          </div>
+          <div id="spinner" class="hidden text-center py-10">
+            <svg
+              class="animate-spin h-8 w-8 text-blue-600 mx-auto"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <p class="mt-2">Parsing...</p>
+          </div>
+          <div
+            id="jsonOutput"
+            class="flex-grow w-full h-96 md:h-[600px] p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-auto text-sm"
+          ></div>
+        </div>
+      </main>
     </div>
 
     <script>
-        // ===================================================================================
-        // Speeduino INI Parser Logic
-        // ===================================================================================
-        class SpeeduinoIniParser {
-            constructor() {
-                this.defines = {};
-                this.config = {};
-                this.flags = {
-                    'LAMBDA': false, 'CELSIUS': true, 'mcu_stm32': false, 'mcu_teensy': false,
-                    'COMMS_COMPAT': false, 'resetcontrol_adv': false, 'MSDROID_COMPAT': false,
-                    'enablehardware_test': false, 'pressure_bar': false
-                };
-                this.currentUserDefinedDialog = null;
-                this.lastUserDefinedElement = null;
-            }
-            
-            splitRespectingQuotes(str, delimiter = ',') {
-                return (str.match(new RegExp(`(?:[^{"${delimiter}]+|\\{[^}]*\\}|"[^"]*")+`, 'g')) || [])
-                    .map(p => p.trim())
-                    .filter(p => p.length > 0);
-            }
-
-            parse(iniString) {
-                this.defines = {};
-                this.config = {};
-                const lines = iniString.split(/\r?\n/);
-                const processedLines = this.preprocess(lines);
-                
-                let currentSection = null;
-                let currentPage = null;
-                let currentGroup = null;
-                let currentMenuDialog = null;
-                let currentMenu = null;
-                let currentGroupMenu = null;
-
-                for (const line of processedLines) {
-                    const trimmedLine = line.trim();
-                    if (!trimmedLine || trimmedLine.startsWith(';') || trimmedLine.startsWith('//')) continue;
-
-                    const sectionMatch = trimmedLine.match(/^\[(.+)\]$/);
-                    if (sectionMatch) {
-                        currentSection = sectionMatch[1];
-                        currentPage = null; currentGroup = null; currentMenuDialog = null;
-                        currentMenu = null; currentGroupMenu = null; this.currentUserDefinedDialog = null;
-
-                        if (currentSection === 'ConstantsExtensions') {
-                            this.config.ConstantsExtensions = { requiresPowerCycle: [], defaultValue: {}, controllerPriority: [] };
-                        } else if (currentSection === 'UserDefined') {
-                            this.config.UserDefined = { dialogs: {} };
-                        } else if (currentSection === 'Menu') {
-                            this.config.Menu = {};
-                        } else if (currentSection === 'Constants') {
-                            this.config.Constants = { pages: {} };
-                        } else {
-                            this.config[currentSection] = this.config[currentSection] || {};
-                        }
-                        continue;
-                    }
-
-                    const pageMatch = trimmedLine.match(/^page\s*=\s*(\d+)/i);
-                    if (pageMatch && currentSection === 'Constants') {
-                        currentPage = pageMatch[1];
-                        this.config.Constants.pages[currentPage] = this.config.Constants.pages[currentPage] || {};
-                        continue;
-                    }
-
-                    const varMatch = trimmedLine.match(/^([\w\.]+)\s*=\s*(.+)$/);
-                    if (varMatch && currentSection) {
-                        const key = varMatch[1];
-                        let value = varMatch[2].trim();
-
-                        if (currentSection === 'ConstantsExtensions') {
-                            this.handleConstantsExtensions(key, value);
-                        } else if (currentSection === 'UserDefined') {
-                            this.handleUserDefinedParsing(key, value);
-                        } else if (currentSection === 'Menu') {
-                            this.handleMenuParsing(key, value);
-                        } else if (currentSection === 'SettingGroups') {
-                            this.handleSettingGroups(key, value, currentGroup);
-                            if (key === 'settingGroup') currentGroup = this.splitRespectingQuotes(value)[0];
-                        } else {
-                            const parsedValue = this.parseLine(key, value);
-                            if (currentSection === 'Constants' && currentPage) {
-                                this.config.Constants.pages[currentPage][key] = parsedValue;
-                            } else {
-                                this.config[currentSection][key] = parsedValue;
-                            }
-                        }
-                    }
-                }
-                return this.config;
-            }
-
-            handleConstantsExtensions(key, value) {
-                if (key === 'requiresPowerCycle' || key === 'controllerPriority') {
-                    this.config.ConstantsExtensions[key].push(value);
-                } else if (key === 'defaultValue') {
-                    const [defKey, ...defValParts] = this.splitRespectingQuotes(value);
-                    this.config.ConstantsExtensions.defaultValue[defKey] = defValParts.join(', ').replace(/^"|"$/g, '');
-                } else {
-                    this.config.ConstantsExtensions[key] = this.parseLine(key, value);
-                }
-            }
-            
-            handleSettingGroups(key, value, currentGroup) {
-                 if (key === 'settingGroup') {
-                    const [name, displayName] = this.splitRespectingQuotes(value);
-                    this.config.SettingGroups[name] = { displayName: displayName.replace(/"/g, ''), options: {} };
-                } else if (key === 'settingOption' && currentGroup) {
-                    const [name, displayName] = this.splitRespectingQuotes(value);
-                    this.config.SettingGroups[currentGroup].options[name] = displayName.replace(/"/g, '');
-                }
-            }
-
-            handleUserDefinedParsing(key, value) {
-                const parts = this.splitRespectingQuotes(value);
-                let element = null;
-
-                switch(key) {
-                    case 'dialog':
-                        const [dialogId, title, layout] = parts;
-                        if (!dialogId) break;
-                        this.currentUserDefinedDialog = {
-                            title: title ? title.replace(/"/g, '') : '',
-                            layout: layout || 'yAxis',
-                            content: []
-                        };
-                        this.config.UserDefined.dialogs[dialogId] = this.currentUserDefinedDialog;
-                        this.lastUserDefinedElement = this.currentUserDefinedDialog;
-                        break;
-                    case 'topicHelp':
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.helpUrl = value.replace(/"/g, '');
-                        break;
-                    case 'field':
-                        const [labelOrVar, variable, ...rest] = parts;
-                        if (!labelOrVar) break;
-                        if (variable) {
-                            element = { type: 'field', label: labelOrVar.replace(/"/g, ''), variable };
-                            if (rest[0] && rest[0] !== '{}') {
-                                element.condition = rest[0];
-                            }
-                            if (rest[1] && rest[1] !== '{}') {
-                                element.highlightCondition = rest[1];
-                            }
-                        } else {
-                            element = { type: 'label', text: labelOrVar.replace(/"/g, '') };
-                            if(labelOrVar.startsWith('!')) element.style = 'warning';
-                            if(labelOrVar.startsWith('#')) element.style = 'heading';
-                        }
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element;
-                        break;
-                    case 'panel':
-                        const [panelDialogId, panelLayout] = parts;
-                        element = { type: 'panel', dialogId: panelDialogId, layout: panelLayout };
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element;
-                        break;
-                    case 'commandButton':
-                        if (!parts[0]) break;
-                        element = { type: 'button', label: parts[0].replace(/"/g, ''), command: parts[1] };
-                        if (parts[2]) element.condition = parts[2];
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element;
-                        break;
-                    case 'slider':
-                        if (!parts[0]) break;
-                        element = { type: 'slider', label: parts[0].replace(/"/g, ''), variable: parts[1], orientation: parts[2] };
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element;
-                        break;
-                    case 'settingSelector':
-                        element = { type: 'selector', label: value.replace(/"/g, ''), options: [] };
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element;
-                        break;
-                    case 'settingOption':
-                        if (this.lastUserDefinedElement && this.lastUserDefinedElement.type === 'selector') {
-                            const [optLabel, ...optSettings] = parts;
-                            if (!optLabel) break;
-                            const settings = {};
-                            optSettings.forEach(s => {
-                                const [sKey, sVal] = s.split('=');
-                                settings[sKey] = isNaN(sVal) ? sVal : parseFloat(sVal);
-                            });
-                            this.lastUserDefinedElement.options.push({ label: optLabel.replace(/"/g, ''), settings });
-                        }
-                        break;
-                    // --- BUG FIX START ---
-                    case 'liveGraph':
-                        const [graphId, graphTitle] = parts;
-                        element = { 
-                            type: 'liveGraph', 
-                            id: graphId, 
-                            title: graphTitle.replace(/"/g, ''),
-                            lines: [] 
-                        };
-                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
-                        this.lastUserDefinedElement = element; // Set this as the last element to attach graphLines
-                        break;
-                    case 'graphLine':
-                        // Ensure the last element was a liveGraph
-                        if (this.lastUserDefinedElement && this.lastUserDefinedElement.type === 'liveGraph') {
-                            const line = {
-                                variable: parts[0],
-                                units: parts[1] ? parts[1].replace(/"/g, '') : null,
-                                low: parts[2] ? parseFloat(parts[2]) : null,
-                                high: parts[3] ? parseFloat(parts[3]) : null,
-                                // auto values can exist
-                                lowColor: parts[4] || null,
-                                highColor: parts[5] || null,
-                            };
-                            this.lastUserDefinedElement.lines.push(line);
-                        }
-                        break;
-                    // --- BUG FIX END ---
-                }
-            }
-
-            handleMenuParsing(key, value) {
-                const parts = this.splitRespectingQuotes(value);
-                switch(key) {
-                    case 'menuDialog':
-                        this.currentMenuDialog = value;
-                        this.config.Menu[this.currentMenuDialog] = this.config.Menu[this.currentMenuDialog] || [];
-                        this.currentMenu = null;
-                        this.currentGroupMenu = null;
-                        break;
-                    case 'menu':
-                        if (!this.currentMenuDialog) break;
-                        this.currentMenu = { type: 'menu', label: value.replace(/"/g, ''), items: [] };
-                        this.config.Menu[this.currentMenuDialog].push(this.currentMenu);
-                        this.currentGroupMenu = null;
-                        break;
-                    case 'subMenu':
-                        if (!this.currentMenu) break;
-                        if (parts[0] === 'std_separator') {
-                            this.currentMenu.items.push({ type: 'separator' });
-                        } else {
-                            const item = { type: 'item', id: parts[0], label: parts[1].replace(/"/g, '') };
-                            if (parts[2]) item.value = isNaN(parts[2]) ? parts[2] : parseInt(parts[2], 10);
-                            if (parts[3]) item.condition = parts[3];
-                            this.currentMenu.items.push(item);
-                        }
-                        break;
-                    case 'groupMenu':
-                        if (!this.currentMenu) break;
-                        this.currentGroupMenu = { type: 'group', label: value.replace(/"/g, ''), items: [] };
-                        this.currentMenu.items.push(this.currentGroupMenu);
-                        break;
-                    case 'groupChildMenu':
-                        if (!this.currentGroupMenu) break;
-                        const childItem = { type: 'item', id: parts[0], label: parts[1].replace(/"/g, '') };
-                        if (parts[2]) childItem.value = isNaN(parts[2]) ? parts[2] : parseInt(parts[2], 10);
-                        if (parts[3]) childItem.condition = parts[3];
-                        this.currentGroupMenu.items.push(childItem);
-                        break;
-                }
-            }
-
-            preprocess(lines) {
-                const defines = {};
-                for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    const defineMatch = trimmedLine.match(/^#define\s+([\w$]+)\s*=\s*(.+)$/);
-                    if (defineMatch) {
-                        defines[defineMatch[1]] = defineMatch[2].trim();
-                    }
-                }
-
-                let substitutionsMade = true;
-                let iterations = 0;
-                while (substitutionsMade && iterations < 15) {
-                    substitutionsMade = false;
-                    for (const key in defines) {
-                        if (defines[key].includes('$')) {
-                            for (const subKey in defines) {
-                                if (key !== subKey) {
-                                    const regex = new RegExp(`\\$${subKey}`, 'g');
-                                    const newValue = defines[key].replace(regex, defines[subKey]);
-                                    if (newValue !== defines[key]) {
-                                        defines[key] = newValue;
-                                        substitutionsMade = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    iterations++;
-                }
-                this.defines = defines;
-
-                let processed = [];
-                const ifStack = [];
-
-                for (const line of lines) {
-                    let trimmedLine = line.trim();
-                    
-                    if (trimmedLine.startsWith('#if')) {
-                        const condition = trimmedLine.substring(4).trim();
-                        ifStack.push(this.flags[condition] || false);
-                        continue;
-                    }
-                    
-                    if (trimmedLine.startsWith('#else')) {
-                        if (ifStack.length > 0) {
-                            ifStack[ifStack.length - 1] = !ifStack[ifStack.length - 1];
-                        }
-                        continue;
-                    }
-
-                    if (trimmedLine.startsWith('#endif')) {
-                        ifStack.pop();
-                        continue;
-                    }
-
-                    if (ifStack.some(v => !v)) {
-                        continue;
-                    }
-
-                    if (trimmedLine.startsWith('#define') || trimmedLine.startsWith('#unset')) {
-                        continue;
-                    }
-
-                    for(const defKey in this.defines) {
-                        trimmedLine = trimmedLine.replace(new RegExp(`\\$${defKey}`, 'g'), this.defines[defKey]);
-                    }
-                   
-                    processed.push(trimmedLine);
-                }
-                
-                return processed;
-            }
-
-            parseLine(key, valueString) {
-                const parts = this.splitRespectingQuotes(valueString);
-                const type = parts[0];
-
-                try {
-                    switch (type) {
-                        case 'scalar':
-                            return this.parseScalar(parts);
-                        case 'array':
-                            return this.parseArray(parts);
-                        case 'bits':
-                            return this.parseBits(parts);
-                        case 'string':
-                            return { type: 'string', class: parts[1], length: parseInt(parts[2]) };
-                        default:
-                            if (parts.length === 1) {
-                                return parts[0].replace(/^"|"$/g, '');
-                            }
-                            return parts.map(s => s.trim().replace(/"/g, ''));
-                    }
-                } catch (e) {
-                    console.warn(`Could not parse line: ${key} = ${valueString}`, e);
-                    return valueString;
-                }
-            }
-            
-            parseScalar(parts) {
-                const obj = { type: 'scalar', class: parts[1], offset: parseInt(parts[2]) };
-                let currentIndex = 3;
-                obj.units = parts[currentIndex++].replace(/"/g, '');
-                obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
-                return obj;
-            }
-
-            parseArray(parts) {
-                const obj = { type: 'array', class: parts[1], offset: parseInt(parts[2]) };
-                let currentIndex = 3;
-                
-                const shapeMatch = parts[currentIndex++].trim().match(/\[\s*(\d+)(?:\s*x\s*(\d+))?\s*\]/);
-                if (shapeMatch) {
-                    const dim1 = parseInt(shapeMatch[1]);
-                    const dim2 = shapeMatch[2] ? parseInt(shapeMatch[2]) : null;
-
-                    if (dim2 !== null) {
-                        obj.shape = { rows: dim1, columns: dim2 };
-                    } else {
-                        obj.shape = { length: dim1 };
-                    }
-                } else {
-                    obj.shape = null;
-                }
-
-                obj.units = parts[currentIndex++].replace(/"/g, '');
-                obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
-                obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
-                return obj;
-            }
-
-            parseBits(parts) {
-                const obj = { type: 'bits', class: parts[1] };
-                let currentIndex = 2;
-                if (!parts[currentIndex].startsWith('[')) {
-                    obj.offset = parseInt(parts[currentIndex++]);
-                }
-                const bitMatch = parts[currentIndex++].match(/\[(\d+):(\d+)\]/);
-                if (bitMatch) {
-                    obj.startBit = parseInt(bitMatch[1]);
-                    obj.endBit = parseInt(bitMatch[2]);
-                }
-                obj.options = parts.slice(currentIndex).map(opt => opt.replace(/"/g, ''));
-                return obj;
-            }
-
-            parseNumberOrExpr(part) {
-                if (part === undefined) return null;
-                if (part.startsWith('{') && part.endsWith('}')) {
-                    return part; // Store expression as string
-                }
-                return parseFloat(part);
-            }
+      // ===================================================================================
+      // Speeduino INI Parser Logic
+      // ===================================================================================
+      class SpeeduinoIniParser {
+        constructor() {
+          this.defines = {};
+          this.config = {};
+          this.flags = {
+            LAMBDA: false,
+            CELSIUS: true,
+            mcu_stm32: false,
+            mcu_teensy: false,
+            COMMS_COMPAT: false,
+            resetcontrol_adv: false,
+            MSDROID_COMPAT: false,
+            enablehardware_test: false,
+            pressure_bar: false,
+          };
+          // State for complex sections
+          this.currentSection = null;
+          this.currentUserDefinedDialog = null;
+          this.lastUserDefinedElement = null;
+          this.currentCurve = null;
+          this.currentTable = null;
+          this.currentGaugeCategory = "Default";
+          this.currentLogger = null;
+          this.currentReferenceTable = null;
         }
 
-        // ===================================================================================
-        // JSON Tree Viewer
-        // ===================================================================================
-        class JSONTreeViewer {
-            constructor() {
-                this.nodeCounter = 0;
-            }
-
-            createTree(obj, key = null, isRoot = true) {
-                this.nodeCounter++;
-                const nodeId = `node-${this.nodeCounter}`;
-                
-                // Handle undefined
-                if (obj === undefined) {
-                    return this.createLeafNode(key, 'undefined', 'json-null');
-                }
-                
-                // Handle null
-                if (obj === null) {
-                    return this.createLeafNode(key, 'null', 'json-null');
-                }
-                
-                if (typeof obj === 'string') {
-                    return this.createLeafNode(key, `"${obj}"`, 'json-string');
-                }
-                
-                if (typeof obj === 'number') {
-                    return this.createLeafNode(key, obj.toString(), 'json-number');
-                }
-                
-                if (typeof obj === 'boolean') {
-                    return this.createLeafNode(key, obj.toString(), 'json-boolean');
-                }
-                
-                if (Array.isArray(obj)) {
-                    return this.createCollapsibleNode(key, obj, nodeId, 'array', isRoot);
-                }
-                
-                if (typeof obj === 'object') {
-                    return this.createCollapsibleNode(key, obj, nodeId, 'object', isRoot);
-                }
-                
-                // Safe fallback for any other types
-                return this.createLeafNode(key, obj != null ? obj.toString() : 'null', 'json-string');
-            }
-            
-            createLeafNode(key, value, className) {
-                const keyHtml = key ? `<span class="json-key">"${key}"</span>: ` : '';
-                return `<div class="json-node">${keyHtml}<span class="${className}">${value}</span></div>`;
-            }
-            
-            createCollapsibleNode(key, obj, nodeId, type, isRoot) {
-                const isArray = Array.isArray(obj);
-                const openBracket = isArray ? '[' : '{';
-                const closeBracket = isArray ? ']' : '}';
-                const keys = isArray ? obj.map((_, i) => i) : Object.keys(obj);
-                const count = keys.length;
-                
-                const keyHtml = key ? `<span class="json-key">"${key}"</span>: ` : '';
-                const toggleIcon = count > 0 ? '▼' : '';
-                const countHtml = count > 0 ? `<span class="json-count">${count} item${count !== 1 ? 's' : ''}</span>` : '';
-                
-                let html = `<div class="json-node">`;
-                
-                if (count > 0) {
-                    html += `<span class="json-toggle" onclick="toggleNode('${nodeId}')">${toggleIcon}</span>`;
-                } else {
-                    html += `<span style="width: 12px; display: inline-block;"></span>`;
-                }
-                
-                html += `${keyHtml}<span class="json-bracket">${openBracket}</span>${countHtml}`;
-                
-                if (count > 0) {
-                    html += `<div id="${nodeId}" class="json-children">`;
-                    
-                    for (let i = 0; i < keys.length; i++) {
-                        const itemKey = keys[i];
-                        let itemValue;
-                        
-                        try {
-                            itemValue = obj[itemKey];
-                        } catch (e) {
-                            itemValue = `[Error accessing property: ${e.message}]`;
-                        }
-                        
-                        html += this.createTree(itemValue, isArray ? null : itemKey, false);
-                        
-                        if (i < keys.length - 1) {
-                            html += '<span class="json-bracket">,</span>';
-                        }
-                    }
-                    
-                    html += `</div><div class="json-node"><span class="json-bracket">${closeBracket}</span></div>`;
-                } else {
-                    html += `<span class="json-bracket">${closeBracket}</span>`;
-                }
-                
-                html += `</div>`;
-                
-                return html;
-            }
-            
-            render(data) {
-                this.nodeCounter = 0;
-                return `<div class="json-tree">${this.createTree(data)}</div>`;
-            }
+        splitRespectingQuotes(str, delimiter = ",") {
+          return (
+            str.match(
+              new RegExp(`(?:[^{"${delimiter}]+|\\{[^}]*\\}|"[^"]*")+`, "g")
+            ) || []
+          )
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0);
         }
 
-        // Global functions for tree interaction
-        function toggleNode(nodeId) {
-            const node = document.getElementById(nodeId);
-            const toggle = node.parentElement.querySelector('.json-toggle');
-            
-            if (node.classList.contains('collapsed')) {
-                node.classList.remove('collapsed');
-                toggle.textContent = '▼';
+        splitValueAndComment(line) {
+          let inQuotes = false;
+          for (let i = 0; i < line.length; i++) {
+            if (line[i] === '"') {
+              inQuotes = !inQuotes;
+            }
+            if (line[i] === ";" && !inQuotes) {
+              return {
+                value: line.substring(0, i).trim(),
+                comment: line.substring(i + 1).trim(),
+              };
+            }
+          }
+          return { value: line.trim(), comment: null };
+        }
+
+        parse(iniString) {
+          this.defines = {};
+          this.config = {};
+          const lines = iniString.split(/\r?\n/);
+          const processedLines = this.preprocess(lines);
+
+          let currentPage = null;
+          let currentGroup = null;
+          let currentMenuDialog = null;
+          let currentMenu = null;
+          let currentGroupMenu = null;
+
+          for (const line of processedLines) {
+            const trimmedLine = line.trim();
+            if (
+              !trimmedLine ||
+              trimmedLine.startsWith(";") ||
+              trimmedLine.startsWith("//")
+            )
+              continue;
+
+            const sectionMatch = trimmedLine.match(/^\[(.+)\]$/);
+            if (sectionMatch) {
+              this.currentSection = sectionMatch[1];
+              currentPage = null;
+              currentGroup = null;
+              currentMenuDialog = null;
+              currentMenu = null;
+              currentGroupMenu = null;
+              this.currentUserDefinedDialog = null;
+              this.currentCurve = null;
+              this.currentTable = null;
+              this.currentGaugeCategory = "Default";
+              this.currentLogger = null;
+              this.currentReferenceTable = null;
+
+              const sectionInitializers = {
+                ConstantsExtensions: () => ({
+                  requiresPowerCycle: [],
+                  defaultValue: {},
+                  controllerPriority: [],
+                }),
+                UserDefined: () => ({ dialogs: {} }),
+                Menu: () => ({}),
+                CurveEditor: () => ({}),
+                TableEditor: () => ({}),
+                GaugeConfigurations: () => ({}),
+                FrontPage: () => ({ gauges: {}, indicators: [] }),
+                Constants: () => ({ pages: {} }),
+                Datalog: () => ({ entries: [] }),
+                LoggerDefinition: () => ({}),
+                ReferenceTables: () => ({ tables: {} }),
+                Tools: () => ({ tools: [] }),
+                VeAnalyze: () => ({ filters: [] }),
+                WueAnalyze: () => ({ filters: [] }),
+              };
+
+              if (sectionInitializers[this.currentSection]) {
+                this.config[this.currentSection] =
+                  sectionInitializers[this.currentSection]();
+              } else {
+                this.config[this.currentSection] =
+                  this.config[this.currentSection] || {};
+              }
+              continue;
+            }
+
+            const pageMatch = trimmedLine.match(/^page\s*=\s*(\d+)/i);
+            if (pageMatch && this.currentSection === "Constants") {
+              currentPage = pageMatch[1];
+              this.config.Constants.pages[currentPage] =
+                this.config.Constants.pages[currentPage] || {};
+              continue;
+            }
+
+            const varMatch = trimmedLine.match(/^([\w\.]+)\s*=\s*(.+)$/);
+            if (varMatch && this.currentSection) {
+              const key = varMatch[1];
+              const rawRightHandSide = varMatch[2].trim();
+
+              const { value, comment } =
+                this.splitValueAndComment(rawRightHandSide);
+
+              const handlers = {
+                ConstantsExtensions: this.handleConstantsExtensions,
+                UserDefined: this.handleUserDefinedParsing,
+                Menu: this.handleMenuParsing,
+                CurveEditor: this.handleCurveEditorParsing,
+                TableEditor: this.handleTableEditorParsing,
+                GaugeConfigurations: this.handleGaugeConfigurationsParsing,
+                FrontPage: this.handleFrontPageParsing,
+                Datalog: this.handleDatalogParsing,
+                LoggerDefinition: this.handleLoggerDefinitionParsing,
+                ReferenceTables: this.handleReferenceTablesParsing,
+                Tools: this.handleToolsParsing,
+                VeAnalyze: this.handleAnalyzeParsing,
+                WueAnalyze: this.handleAnalyzeParsing,
+                SettingGroups: this.handleSettingGroups,
+              };
+
+              if (handlers[this.currentSection]) {
+                handlers[this.currentSection].call(
+                  this,
+                  key,
+                  value,
+                  comment,
+                  currentGroup
+                );
+                if (
+                  this.currentSection === "SettingGroups" &&
+                  key === "settingGroup"
+                ) {
+                  currentGroup = this.splitRespectingQuotes(value)[0];
+                }
+              } else {
+                const parsedValue = this.parseLine(key, value);
+                if (
+                  comment &&
+                  typeof parsedValue === "object" &&
+                  parsedValue !== null &&
+                  !Array.isArray(parsedValue)
+                ) {
+                  parsedValue.comment = comment;
+                }
+
+                if (this.currentSection === "Constants" && currentPage) {
+                  this.config.Constants.pages[currentPage][key] = parsedValue;
+                } else {
+                  this.config[this.currentSection][key] = parsedValue;
+                }
+              }
+            }
+          }
+          return this.config;
+        }
+
+        handleFrontPageParsing(key, value, comment) {
+          if (key.startsWith("gauge")) {
+            this.config.FrontPage.gauges[key] = value;
+          } else if (key === "indicator") {
+            const parts = this.splitRespectingQuotes(value);
+            const indicator = {
+              expression: parts[0],
+              offLabel: parts[1] ? parts[1].replace(/"/g, "") : "",
+              onLabel: parts[2] ? parts[2].replace(/"/g, "") : "",
+              offBg: parts[3],
+              offFg: parts[4],
+              onBg: parts[5],
+              onFg: parts[6],
+            };
+            if (comment) indicator.comment = comment;
+            this.config.FrontPage.indicators.push(indicator);
+          }
+        }
+
+        handleGaugeConfigurationsParsing(key, value, comment) {
+          if (key === "gaugeCategory") {
+            this.currentGaugeCategory = value.replace(/"/g, "");
+            if (!this.config.GaugeConfigurations[this.currentGaugeCategory]) {
+              this.config.GaugeConfigurations[this.currentGaugeCategory] = [];
+            }
+          } else {
+            const parts = this.splitRespectingQuotes(value);
+            const gauge = {
+              name: key,
+              variable: parts[0],
+              title: parts[1] ? parts[1].replace(/"/g, "") : "",
+              units: parts[2] ? parts[2].replace(/"/g, "") : "",
+              low: this.parseNumberOrExpr(parts[3]),
+              high: this.parseNumberOrExpr(parts[4]),
+              lowDanger: this.parseNumberOrExpr(parts[5]),
+              lowWarning: this.parseNumberOrExpr(parts[6]),
+              highWarning: this.parseNumberOrExpr(parts[7]),
+              highDanger: this.parseNumberOrExpr(parts[8]),
+              valueDecimals: this.parseNumberOrExpr(parts[9]),
+              labelDecimals: this.parseNumberOrExpr(parts[10]),
+            };
+            if (comment) gauge.comment = comment;
+            if (!this.config.GaugeConfigurations[this.currentGaugeCategory]) {
+              this.config.GaugeConfigurations[this.currentGaugeCategory] = [];
+            }
+            this.config.GaugeConfigurations[this.currentGaugeCategory].push(
+              gauge
+            );
+          }
+        }
+
+        handleDatalogParsing(key, value, comment) {
+          if (key === "entry") {
+            const parts = this.splitRespectingQuotes(value);
+            const entry = {
+              channel: parts[0],
+              label: parts[1] ? parts[1].replace(/"/g, "") : "",
+              type: parts[2],
+              format: parts[3] ? parts[3].replace(/"/g, "") : "",
+            };
+            if (parts[4]) entry.condition = parts[4];
+            if (comment) entry.comment = comment;
+            this.config.Datalog.entries.push(entry);
+          }
+        }
+
+        handleLoggerDefinitionParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          if (key === "loggerDef") {
+            const [id, title, type] = parts;
+            this.currentLogger = {
+              title: title.replace(/"/g, ""),
+              type,
+              properties: {},
+              recordFields: [],
+              calcFields: [],
+            };
+            if (comment) this.currentLogger.comment = comment;
+            this.config.LoggerDefinition[id] = this.currentLogger;
+          } else if (this.currentLogger) {
+            if (key === "recordField") {
+              this.currentLogger.recordFields.push({
+                name: parts[0],
+                header: parts[1].replace(/"/g, ""),
+                startBit: parseInt(parts[2]),
+                bitCount: parseInt(parts[3]),
+                scale: parseFloat(parts[4]),
+                units: parts[5].replace(/"/g, ""),
+              });
+            } else if (key === "calcField") {
+              this.currentLogger.calcFields.push({
+                name: parts[0],
+                header: parts[1].replace(/"/g, ""),
+                units: parts[2].replace(/"/g, ""),
+                expression: parts[3],
+                hidden: parts[4] === "hidden",
+              });
             } else {
-                node.classList.add('collapsed');
-                toggle.textContent = '▶';
+              const parsedValue = this.parseLine(key, value);
+              if (
+                comment &&
+                typeof parsedValue === "object" &&
+                parsedValue !== null
+              ) {
+                parsedValue.comment = comment;
+              }
+              this.currentLogger.properties[key] = parsedValue;
             }
+          }
         }
 
-        function expandAllNodes() {
-            const collapsedNodes = document.querySelectorAll('.json-children.collapsed');
-            const toggles = document.querySelectorAll('.json-toggle');
-            
-            collapsedNodes.forEach(node => {
-                node.classList.remove('collapsed');
-            });
-            
-            toggles.forEach(toggle => {
-                if (toggle.textContent === '▶') {
-                    toggle.textContent = '▼';
-                }
-            });
+        handleReferenceTablesParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          if (key === "referenceTable") {
+            const [id, title] = parts;
+            this.currentReferenceTable = {
+              title: title.replace(/"/g, ""),
+              properties: {},
+              generators: [],
+              solutions: [],
+            };
+            if (comment) this.currentReferenceTable.comment = comment;
+            this.config.ReferenceTables.tables[id] = this.currentReferenceTable;
+          } else if (this.currentReferenceTable) {
+            if (key === "tableGenerator") {
+              this.currentReferenceTable.generators.push({
+                type: parts[0],
+                label: parts[1].replace(/"/g, ""),
+              });
+            } else if (key === "thermOption" || key === "solution") {
+              this.currentReferenceTable.solutions.push({
+                name: parts[0].replace(/"/g, ""),
+                value: parts.slice(1).join(", "),
+              });
+            } else {
+              const parsedValue = this.parseLine(key, value);
+              if (
+                comment &&
+                typeof parsedValue === "object" &&
+                parsedValue !== null
+              ) {
+                parsedValue.comment = comment;
+              }
+              this.currentReferenceTable.properties[key] = parsedValue;
+            }
+          } else {
+            const parsedValue = this.parseLine(key, value);
+            if (
+              comment &&
+              typeof parsedValue === "object" &&
+              parsedValue !== null
+            ) {
+              parsedValue.comment = comment;
+            }
+            this.config.ReferenceTables[key] = parsedValue;
+          }
         }
 
-        function collapseAllNodes() {
-            const expandedNodes = document.querySelectorAll('.json-children:not(.collapsed)');
-            const toggles = document.querySelectorAll('.json-toggle');
-            
-            expandedNodes.forEach(node => {
-                node.classList.add('collapsed');
-            });
-            
-            toggles.forEach(toggle => {
-                if (toggle.textContent === '▼') {
-                    toggle.textContent = '▶';
-                }
-            });
+        handleToolsParsing(key, value, comment) {
+          if (key === "addTool") {
+            const [name, panel, tableId] = this.splitRespectingQuotes(value);
+            const tool = { name, panel: panel.replace(/"/g, ""), tableId };
+            if (comment) tool.comment = comment;
+            this.config.Tools.tools.push(tool);
+          }
         }
 
-        // ===================================================================================
-        // DOM Interaction
-        // ===================================================================================
-        document.addEventListener('DOMContentLoaded', () => {
-            const iniInput = document.getElementById('iniInput');
-            const fileInput = document.getElementById('fileInput');
-            const parseButton = document.getElementById('parseButton');
-            const jsonOutput = document.getElementById('jsonOutput');
-            const spinner = document.getElementById('spinner');
-            const copyButton = document.getElementById('copyButton');
-            const treeViewBtn = document.getElementById('treeViewBtn');
-            const rawViewBtn = document.getElementById('rawViewBtn');
-            const expandAllBtn = document.getElementById('expandAllBtn');
-            const collapseAllBtn = document.getElementById('collapseAllBtn');
-            
-            let parsedJsonString = '';
-            let parsedJsonObject = null;
-            let currentFileName = '';
-            let currentViewMode = 'tree'; // 'tree' or 'raw'
-            const treeViewer = new JSONTreeViewer();
+        handleAnalyzeParsing(key, value, comment) {
+          const section = this.config[this.currentSection];
+          if (!section) return;
 
-            // File upload handler
-            fileInput.addEventListener('change', (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
+          const parts = this.splitRespectingQuotes(value);
+          if (key.endsWith("AnalyzeMap")) {
+            if (key === "veAnalyzeMap") {
+              section.map = {
+                tableName: parts[0],
+                lambdaTargetTableName: parts[1],
+                lambdaChannel: parts[2],
+                egoCorrectionChannel: parts[3],
+              };
+            } else if (key === "wueAnalyzeMap") {
+              section.map = {
+                wueCurveName: parts[0],
+                afrTempCompensationCurve: parts[1],
+                lambdaTargetTableName: parts[2],
+                lambdaChannel: parts[3],
+                coolantTempChannel: parts[4],
+                wueChannel: parts[5],
+                egoCorrectionChannel: parts[6],
+              };
+            }
+            if (comment && section.map) section.map.comment = comment;
+          } else if (key === "lambdaTargetTables") {
+            section.lambdaTargetTables = parts;
+          } else if (key === "filter") {
+            const filter = {
+              id: parts[0],
+              label: parts[1] ? parts[1].replace(/"/g, "") : null,
+              channel: parts[2],
+              operator: parts[3],
+              value: parts[4],
+              enabled: parts[5] === "true",
+            };
+            if (comment) filter.comment = comment;
+            section.filters.push(filter);
+          }
+        }
 
-                // Validate file type
-                if (!file.name.toLowerCase().endsWith('.ini') && !file.name.toLowerCase().endsWith('.txt')) {
-                    alert('Silakan pilih file dengan ekstensi .ini atau .txt');
-                    fileInput.value = '';
-                    return;
-                }
+        handleConstantsExtensions(key, value, comment) {
+          if (key === "requiresPowerCycle" || key === "controllerPriority") {
+            this.config.ConstantsExtensions[key].push(value);
+          } else if (key === "defaultValue") {
+            const [defKey, ...defValParts] = this.splitRespectingQuotes(value);
+            this.config.ConstantsExtensions.defaultValue[defKey] = defValParts
+              .join(", ")
+              .replace(/^"|"$/g, "");
+          } else {
+            const parsedValue = this.parseLine(key, value);
+            if (
+              comment &&
+              typeof parsedValue === "object" &&
+              parsedValue !== null
+            ) {
+              parsedValue.comment = comment;
+            }
+            this.config.ConstantsExtensions[key] = parsedValue;
+          }
+        }
 
-                // Validate file size (10MB limit)
-                if (file.size > 10 * 1024 * 1024) {
-                    alert('File terlalu besar. Maksimal 10MB.');
-                    fileInput.value = '';
-                    return;
-                }
+        handleSettingGroups(key, value, comment, currentGroup) {
+          if (key === "settingGroup") {
+            const [name, displayName] = this.splitRespectingQuotes(value);
+            this.config.SettingGroups[name] = {
+              displayName: displayName.replace(/"/g, ""),
+              options: {},
+            };
+          } else if (key === "settingOption" && currentGroup) {
+            const [name, displayName] = this.splitRespectingQuotes(value);
+            this.config.SettingGroups[currentGroup].options[name] =
+              displayName.replace(/"/g, "");
+          }
+        }
 
-                currentFileName = file.name;
-                const reader = new FileReader();
-                
-                reader.onload = (e) => {
-                    iniInput.value = e.target.result;
-                    updateFileStatus(`File "${currentFileName}" berhasil dimuat`);
+        handleUserDefinedParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          let element = null;
+
+          switch (key) {
+            case "dialog":
+              const [dialogId, title, layout] = parts;
+              if (!dialogId) break;
+              this.currentUserDefinedDialog = {
+                title: title ? title.replace(/"/g, "") : "",
+                layout: layout || "yAxis",
+                content: [],
+              };
+              if (comment) this.currentUserDefinedDialog.comment = comment;
+              this.config.UserDefined.dialogs[dialogId] =
+                this.currentUserDefinedDialog;
+              this.lastUserDefinedElement = this.currentUserDefinedDialog;
+              break;
+            case "topicHelp":
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.topicHelp = value.replace(
+                  /"/g,
+                  ""
+                );
+              break;
+            case "field":
+              const [labelOrVar, variable, ...rest] = parts;
+              if (!labelOrVar) break;
+              if (variable) {
+                element = {
+                  type: "field",
+                  label: labelOrVar.replace(/"/g, ""),
+                  variable,
                 };
-
-                reader.onerror = () => {
-                    alert('Terjadi kesalahan saat membaca file');
-                    fileInput.value = '';
-                    currentFileName = '';
+                if (rest[0] && rest[0] !== "{}") {
+                  element.condition = rest[0];
+                }
+                if (rest[1] && rest[1] !== "{}") {
+                  element.highlightCondition = rest[1];
+                }
+              } else {
+                element = { type: "label", text: labelOrVar.replace(/"/g, "") };
+                if (labelOrVar.startsWith("!")) element.style = "warning";
+                if (labelOrVar.startsWith("#")) element.style = "heading";
+              }
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "panel":
+              const [panelDialogId, panelLayout] = parts;
+              element = {
+                type: "panel",
+                dialogId: panelDialogId,
+                layout: panelLayout,
+              };
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "commandButton":
+              if (!parts[0]) break;
+              element = {
+                type: "button",
+                label: parts[0].replace(/"/g, ""),
+                command: parts[1],
+              };
+              if (parts[2]) element.condition = parts[2];
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "slider":
+              if (!parts[0]) break;
+              element = {
+                type: "slider",
+                label: parts[0].replace(/"/g, ""),
+                variable: parts[1],
+                orientation: parts[2],
+              };
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "settingSelector":
+              element = {
+                type: "selector",
+                label: value.replace(/"/g, ""),
+                options: [],
+              };
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "settingOption":
+              if (
+                this.lastUserDefinedElement &&
+                this.lastUserDefinedElement.type === "selector"
+              ) {
+                const [optLabel, ...optSettings] = parts;
+                if (!optLabel) break;
+                const settings = {};
+                optSettings.forEach((s) => {
+                  const [sKey, sVal] = s.split("=");
+                  settings[sKey] = isNaN(sVal) ? sVal : parseFloat(sVal);
+                });
+                this.lastUserDefinedElement.options.push({
+                  label: optLabel.replace(/"/g, ""),
+                  settings,
+                });
+              }
+              break;
+            case "liveGraph":
+              const [graphId, graphTitle] = parts;
+              element = {
+                type: "liveGraph",
+                id: graphId,
+                title: graphTitle.replace(/"/g, ""),
+                lines: [],
+              };
+              if (comment) element.comment = comment;
+              if (this.currentUserDefinedDialog)
+                this.currentUserDefinedDialog.content.push(element);
+              this.lastUserDefinedElement = element;
+              break;
+            case "graphLine":
+              if (
+                this.lastUserDefinedElement &&
+                this.lastUserDefinedElement.type === "liveGraph"
+              ) {
+                const line = {
+                  variable: parts[0],
+                  units: parts[1] ? parts[1].replace(/"/g, "") : null,
+                  low: parts[2] ? parseFloat(parts[2]) : null,
+                  high: parts[3] ? parseFloat(parts[3]) : null,
+                  lowColor: parts[4] || null,
+                  highColor: parts[5] || null,
                 };
+                if (comment) line.comment = comment;
+                this.lastUserDefinedElement.lines.push(line);
+              }
+              break;
+          }
+        }
 
-                reader.readAsText(file);
-            });
+        handleCurveEditorParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          switch (key) {
+            case "curve":
+              const [id, title] = parts;
+              this.currentCurve = {
+                title: title ? title.replace(/"/g, "") : "",
+                properties: {},
+              };
+              if (comment) this.currentCurve.comment = comment;
+              this.config.CurveEditor[id] = this.currentCurve;
+              break;
+            case "columnLabel":
+            case "lineLabel":
+              if (this.currentCurve) {
+                this.currentCurve.properties[key] = parts.map((p) =>
+                  p.replace(/"/g, "")
+                );
+              }
+              break;
+            case "xAxis":
+            case "yAxis":
+              if (this.currentCurve) {
+                const [low, high, digits] = parts.map((p) => parseFloat(p));
+                this.currentCurve.properties[key] = { low, high, digits };
+              }
+              break;
+            case "xBins":
+            case "yBins":
+              if (this.currentCurve) {
+                const [variable, channel] = parts;
+                this.currentCurve.properties[key] = { variable, channel };
+              }
+              break;
+            case "gauge":
+            case "size":
+              if (this.currentCurve) {
+                this.currentCurve.properties[key] = value;
+              }
+              break;
+          }
+        }
 
-            // Update file status display
-            function updateFileStatus(message) {
-                // Find or create status element
-                let statusElement = document.getElementById('fileStatus');
-                if (!statusElement) {
-                    statusElement = document.createElement('div');
-                    statusElement.id = 'fileStatus';
-                    statusElement.className = 'mt-2 text-sm font-medium text-green-600';
-                    fileInput.parentElement.parentElement.parentElement.appendChild(statusElement);
-                }
-                statusElement.textContent = message;
-                statusElement.className = 'mt-2 text-sm font-medium text-green-600';
-                
-                // Clear status after 3 seconds
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 3000);
+        handleTableEditorParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          switch (key) {
+            case "table":
+              const [tableId, map3dId, title, page] = parts;
+              this.currentTable = {
+                map3dId: map3dId,
+                title: title.replace(/"/g, ""),
+                page: parseInt(page),
+                properties: {},
+              };
+              if (comment) this.currentTable.comment = comment;
+              this.config.TableEditor[tableId] = this.currentTable;
+              break;
+            case "topicHelp":
+              if (this.currentTable)
+                this.currentTable.topicHelp = value.replace(/"/g, "");
+              break;
+            case "xBins":
+            case "yBins":
+            case "zBins":
+              if (this.currentTable) {
+                const [variable, channel] = parts;
+                this.currentTable.properties[key] = { variable, channel };
+              }
+              break;
+            case "xyLabels":
+            case "upDownLabel":
+              if (this.currentTable) {
+                this.currentTable.properties[key] = parts.map((p) =>
+                  p.replace(/"/g, "")
+                );
+              }
+              break;
+            case "gridHeight":
+              if (this.currentTable) {
+                this.currentTable.properties[key] = parseFloat(parts[0]);
+              }
+              break;
+            case "gridOrient":
+              if (this.currentTable) {
+                this.currentTable.properties[key] = parts.map((p) =>
+                  parseFloat(p)
+                );
+              }
+              break;
+          }
+        }
+
+        handleMenuParsing(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          switch (key) {
+            case "menuDialog":
+              this.currentMenuDialog = value;
+              this.config.Menu[this.currentMenuDialog] =
+                this.config.Menu[this.currentMenuDialog] || [];
+              this.currentMenu = null;
+              this.currentGroupMenu = null;
+              break;
+            case "menu":
+              if (!this.currentMenuDialog) break;
+              this.currentMenu = {
+                type: "menu",
+                label: value.replace(/"/g, ""),
+                items: [],
+              };
+              if (comment) this.currentMenu.comment = comment;
+              this.config.Menu[this.currentMenuDialog].push(this.currentMenu);
+              this.currentGroupMenu = null;
+              break;
+            case "subMenu":
+              if (!this.currentMenu) break;
+              if (parts[0] === "std_separator") {
+                this.currentMenu.items.push({ type: "separator" });
+              } else {
+                const item = {
+                  type: "item",
+                  id: parts[0],
+                  label: parts[1].replace(/"/g, ""),
+                };
+                if (parts[2])
+                  item.value = isNaN(parts[2])
+                    ? parts[2]
+                    : parseInt(parts[2], 10);
+                if (parts[3]) item.condition = parts[3];
+                if (comment) item.comment = comment;
+                this.currentMenu.items.push(item);
+              }
+              break;
+            case "groupMenu":
+              if (!this.currentMenu) break;
+              this.currentGroupMenu = {
+                type: "group",
+                label: value.replace(/"/g, ""),
+                items: [],
+              };
+              if (comment) this.currentGroupMenu.comment = comment;
+              this.currentMenu.items.push(this.currentGroupMenu);
+              break;
+            case "groupChildMenu":
+              if (!this.currentGroupMenu) break;
+              const childItem = {
+                type: "item",
+                id: parts[0],
+                label: parts[1].replace(/"/g, ""),
+              };
+              if (parts[2])
+                childItem.value = isNaN(parts[2])
+                  ? parts[2]
+                  : parseInt(parts[2], 10);
+              if (parts[3]) childItem.condition = parts[3];
+              if (comment) childItem.comment = comment;
+              this.currentGroupMenu.items.push(childItem);
+              break;
+          }
+        }
+
+        preprocess(lines) {
+          const defines = {};
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            const defineMatch = trimmedLine.match(
+              /^#define\s+([\w$]+)\s*=\s*(.+)$/
+            );
+            if (defineMatch) {
+              defines[defineMatch[1]] = defineMatch[2].trim();
             }
+          }
 
-            // Drag and drop functionality
-            const dropArea = fileInput.parentElement.parentElement.parentElement;
-            
-            // Prevent default drag behaviors
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, preventDefaults, false);
-                document.body.addEventListener(eventName, preventDefaults, false);
-            });
-
-            // Highlight drop area when item is dragged over it
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropArea.addEventListener(eventName, highlight, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropArea.addEventListener(eventName, unhighlight, false);
-            });
-
-            // Handle dropped files
-            dropArea.addEventListener('drop', handleDrop, false);
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            function highlight(e) {
-                dropArea.classList.add('border-blue-500', 'bg-blue-50');
-            }
-
-            function unhighlight(e) {
-                dropArea.classList.remove('border-blue-500', 'bg-blue-50');
-            }
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const files = dt.files;
-
-                if (files.length > 0) {
-                    const file = files[0];
-                    
-                    // Create a new FileList-like object for the input
-                    const dataTransfer = new DataTransfer();
-                    dataTransfer.items.add(file);
-                    fileInput.files = dataTransfer.files;
-
-                    // Trigger the change event manually
-                    const event = new Event('change', { bubbles: true });
-                    fileInput.dispatchEvent(event);
-                }
-            }
-
-            // Pre-fill the textarea with the provided config for convenience
-            fetch('https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini')
-                .then(response => response.text())
-                .then(text => {
-                    iniInput.value = text;
-                });
-
-            // View mode functions
-            function updateViewButtons() {
-                if (currentViewMode === 'tree') {
-                    treeViewBtn.classList.add('bg-gray-600', 'text-white');
-                    treeViewBtn.classList.remove('text-gray-300');
-                    rawViewBtn.classList.remove('bg-gray-600', 'text-white');
-                    rawViewBtn.classList.add('text-gray-300');
-                    expandAllBtn.disabled = false;
-                    collapseAllBtn.disabled = false;
-                } else {
-                    rawViewBtn.classList.add('bg-gray-600', 'text-white');
-                    rawViewBtn.classList.remove('text-gray-300');
-                    treeViewBtn.classList.remove('bg-gray-600', 'text-white');
-                    treeViewBtn.classList.add('text-gray-300');
-                    expandAllBtn.disabled = true;
-                    collapseAllBtn.disabled = true;
-                }
-            }
-
-            function renderCurrentView() {
-                if (!parsedJsonObject) return;
-                
-                if (currentViewMode === 'tree') {
-                    try {
-                        jsonOutput.innerHTML = treeViewer.render(parsedJsonObject);
-                        jsonOutput.classList.add('json-tree');
-                        jsonOutput.classList.remove('font-mono');
-                    } catch (error) {
-                        console.warn('Tree view render failed, falling back to raw view:', error);
-                        // Fallback to raw view if tree rendering fails
-                        currentViewMode = 'raw';
-                        updateViewButtons();
-                        jsonOutput.innerHTML = `<div class="text-red-400 mb-4">⚠️ Tree view failed. Showing raw JSON instead.</div><pre class="font-mono">${parsedJsonString}</pre>`;
-                        jsonOutput.classList.remove('json-tree');
-                        jsonOutput.classList.add('font-mono');
+          let substitutionsMade = true;
+          let iterations = 0;
+          while (substitutionsMade && iterations < 15) {
+            substitutionsMade = false;
+            for (const key in defines) {
+              if (defines[key].includes("$")) {
+                for (const subKey in defines) {
+                  if (key !== subKey) {
+                    const regex = new RegExp(`\\$${subKey}`, "g");
+                    const newValue = defines[key].replace(
+                      regex,
+                      defines[subKey]
+                    );
+                    if (newValue !== defines[key]) {
+                      defines[key] = newValue;
+                      substitutionsMade = true;
                     }
-                } else {
-                    jsonOutput.textContent = parsedJsonString;
-                    jsonOutput.classList.remove('json-tree');
-                    jsonOutput.classList.add('font-mono');
+                  }
                 }
+              }
+            }
+            iterations++;
+          }
+          this.defines = defines;
+
+          let processed = [];
+          const ifStack = [];
+
+          for (const line of lines) {
+            let trimmedLine = line.trim();
+
+            if (trimmedLine.startsWith("#if")) {
+              const condition = trimmedLine.substring(4).trim();
+              ifStack.push(this.flags[condition] || false);
+              continue;
             }
 
-            // View control event listeners
-            treeViewBtn.addEventListener('click', () => {
-                if (currentViewMode !== 'tree') {
-                    currentViewMode = 'tree';
-                    updateViewButtons();
-                    renderCurrentView();
-                }
-            });
-
-            rawViewBtn.addEventListener('click', () => {
-                if (currentViewMode !== 'raw') {
-                    currentViewMode = 'raw';
-                    updateViewButtons();
-                    renderCurrentView();
-                }
-            });
-
-            expandAllBtn.addEventListener('click', () => {
-                if (currentViewMode === 'tree') {
-                    expandAllNodes();
-                }
-            });
-
-            collapseAllBtn.addEventListener('click', () => {
-                if (currentViewMode === 'tree') {
-                    collapseAllNodes();
-                }
-            });
-
-            parseButton.addEventListener('click', () => {
-                const iniContent = iniInput.value;
-                if (!iniContent) {
-                    jsonOutput.textContent = 'Silakan tempelkan konten .ini terlebih dahulu.';
-                    return;
-                }
-
-                jsonOutput.innerHTML = '';
-                spinner.classList.remove('hidden');
-                copyButton.disabled = true;
-                expandAllBtn.disabled = true;
-                collapseAllBtn.disabled = true;
-                parsedJsonString = ''; // Reset on new parse
-                parsedJsonObject = null;
-
-                setTimeout(() => {
-                    try {
-                        const parser = new SpeeduinoIniParser();
-                        const config = parser.parse(iniContent);
-                        parsedJsonObject = config;
-                        parsedJsonString = JSON.stringify(config, null, 2);
-                        copyButton.disabled = false;
-                        
-                        renderCurrentView();
-                        updateViewButtons();
-                    } catch (error) {
-                        jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
-                        console.error("Parsing Error:", error);
-                    } finally {
-                        spinner.classList.add('hidden');
-                    }
-                }, 50);
-            });
-
-            copyButton.addEventListener('click', () => {
-                if (!parsedJsonString) return;
-
-                navigator.clipboard.writeText(parsedJsonString).then(() => {
-                    showCopySuccess();
-                }).catch(err => {
-                    console.warn('Async clipboard API failed, trying fallback:', err);
-                    try {
-                        const textArea = document.createElement("textarea");
-                        textArea.value = parsedJsonString;
-                        textArea.style.position = "fixed";
-                        textArea.style.top = "-9999px";
-                        textArea.style.left = "-9999px";
-                        document.body.appendChild(textArea);
-                        textArea.focus();
-                        textArea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textArea);
-                        showCopySuccess();
-                    } catch (fallbackErr) {
-                        console.error('Fallback copy method failed:', fallbackErr);
-                        copyButton.textContent = 'Gagal Menyalin!';
-                        copyButton.classList.add('bg-red-600');
-                        setTimeout(() => {
-                            copyButton.textContent = 'Copy JSON';
-                            copyButton.classList.remove('bg-red-600');
-                        }, 2000);
-                    }
-                });
-            });
-
-            function showCopySuccess() {
-                const originalText = copyButton.textContent;
-                copyButton.textContent = 'Disalin!';
-                copyButton.classList.add('bg-green-600', 'hover:bg-green-700');
-                copyButton.classList.remove('bg-gray-600', 'hover:bg-gray-500');
-                setTimeout(() => {
-                    copyButton.textContent = originalText;
-                    copyButton.classList.remove('bg-green-600', 'hover:bg-green-700');
-                    copyButton.classList.add('bg-gray-600', 'hover:bg-gray-500');
-                }, 2000);
+            if (trimmedLine.startsWith("#else")) {
+              if (ifStack.length > 0) {
+                ifStack[ifStack.length - 1] = !ifStack[ifStack.length - 1];
+              }
+              continue;
             }
 
+            if (trimmedLine.startsWith("#endif")) {
+              ifStack.pop();
+              continue;
+            }
+
+            if (ifStack.some((v) => !v)) {
+              continue;
+            }
+
+            if (
+              trimmedLine.startsWith("#define") ||
+              trimmedLine.startsWith("#unset")
+            ) {
+              continue;
+            }
+
+            for (const defKey in this.defines) {
+              trimmedLine = trimmedLine.replace(
+                new RegExp(`\\$${defKey}`, "g"),
+                this.defines[defKey]
+              );
+            }
+
+            processed.push(trimmedLine);
+          }
+
+          return processed;
+        }
+
+        parseLine(key, valueString) {
+          const parts = this.splitRespectingQuotes(valueString);
+          const type = parts[0];
+
+          try {
+            switch (type) {
+              case "scalar":
+                return this.parseScalar(parts);
+              case "array":
+                return this.parseArray(parts);
+              case "bits":
+                return this.parseBits(parts);
+              case "string":
+                return {
+                  type: "string",
+                  class: parts[1],
+                  length: parseInt(parts[2]),
+                };
+              default:
+                if (parts.length === 1) {
+                  return parts[0].replace(/^"|"$/g, "");
+                }
+                return parts.map((s) => s.trim().replace(/"/g, ""));
+            }
+          } catch (e) {
+            console.warn(`Could not parse line: ${key} = ${valueString}`, e);
+            return valueString;
+          }
+        }
+
+        parseScalar(parts) {
+          const obj = {
+            type: "scalar",
+            class: parts[1],
+            offset: parseInt(parts[2]),
+          };
+          let currentIndex = 3;
+          obj.units = parts[currentIndex++].replace(/"/g, "");
+          obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
+          return obj;
+        }
+
+        parseArray(parts) {
+          const obj = {
+            type: "array",
+            class: parts[1],
+            offset: parseInt(parts[2]),
+          };
+          let currentIndex = 3;
+
+          const shapeMatch = parts[currentIndex++]
+            .trim()
+            .match(/\[\s*(\d+)(?:\s*x\s*(\d+))?\s*\]/);
+          if (shapeMatch) {
+            const dim1 = parseInt(shapeMatch[1]);
+            const dim2 = shapeMatch[2] ? parseInt(shapeMatch[2]) : null;
+
+            if (dim2 !== null) {
+              obj.shape = { rows: dim1, columns: dim2 };
+            } else {
+              obj.shape = { length: dim1 };
+            }
+          } else {
+            obj.shape = null;
+          }
+
+          obj.units = parts[currentIndex++].replace(/"/g, "");
+          obj.scale = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.translate = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.low = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.high = this.parseNumberOrExpr(parts[currentIndex++]);
+          obj.digits = this.parseNumberOrExpr(parts[currentIndex++]);
+          return obj;
+        }
+
+        parseBits(parts) {
+          const obj = { type: "bits", class: parts[1] };
+          let currentIndex = 2;
+          if (!parts[currentIndex].startsWith("[")) {
+            obj.offset = parseInt(parts[currentIndex++]);
+          }
+          const bitMatch = parts[currentIndex++].match(/\[(\d+):(\d+)\]/);
+          if (bitMatch) {
+            obj.startBit = parseInt(bitMatch[1]);
+            obj.endBit = parseInt(bitMatch[2]);
+          }
+          obj.options = parts
+            .slice(currentIndex)
+            .map((opt) => opt.replace(/"/g, ""));
+          return obj;
+        }
+
+        parseNumberOrExpr(part) {
+          if (part === undefined) return null;
+          if (part.startsWith("{") && part.endsWith("}")) {
+            return part; // Store expression as string
+          }
+          return parseFloat(part);
+        }
+      }
+
+      // ===================================================================================
+      // DOM Interaction
+      // ===================================================================================
+      document.addEventListener("DOMContentLoaded", () => {
+        const iniInput = document.getElementById("iniInput");
+        const parseButton = document.getElementById("parseButton");
+        const jsonOutput = document.getElementById("jsonOutput");
+        const spinner = document.getElementById("spinner");
+        const copyButton = document.getElementById("copyButton");
+        const uploadButton = document.getElementById("uploadButton");
+        const fileInput = document.getElementById("fileInput");
+
+        let parsedJsonString = "";
+
+        // Pre-fill the textarea with the provided config for convenience
+        fetch(
+          "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini"
+        )
+          .then((response) => response.text())
+          .then((text) => {
+            iniInput.value = text;
+          });
+
+        parseButton.addEventListener("click", () => {
+          const iniContent = iniInput.value;
+          if (!iniContent) {
+            jsonOutput.innerHTML =
+              '<span class="text-gray-400">Silakan tempelkan konten .ini terlebih dahulu.</span>';
+            return;
+          }
+
+          jsonOutput.innerHTML = "";
+          spinner.classList.remove("hidden");
+          copyButton.disabled = true;
+          document.getElementById("expandButton").disabled = true;
+          document.getElementById("collapseButton").disabled = true;
+          parsedJsonString = ""; // Reset on new parse
+
+          setTimeout(() => {
+            try {
+              const parser = new SpeeduinoIniParser();
+              const config = parser.parse(iniContent);
+              parsedJsonString = JSON.stringify(config, null, 2);
+              copyButton.disabled = false;
+              document.getElementById("expandButton").disabled = false;
+              document.getElementById("collapseButton").disabled = false;
+
+              // Render the JSON Tree
+              jsonOutput.innerHTML = ""; // Clear previous content
+              jsonOutput.appendChild(createJsonTree(config));
+            } catch (error) {
+              jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
+              console.error("Parsing Error:", error);
+            } finally {
+              spinner.classList.add("hidden");
+            }
+          }, 50);
         });
+
+        uploadButton.addEventListener("click", () => {
+          fileInput.click();
+        });
+
+        fileInput.addEventListener("change", (event) => {
+          const file = event.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              iniInput.value = e.target.result;
+              parseButton.click();
+            };
+            reader.readAsText(file);
+          }
+        });
+
+        copyButton.addEventListener("click", () => {
+          if (!parsedJsonString) return;
+
+          navigator.clipboard
+            .writeText(parsedJsonString)
+            .then(() => {
+              showCopySuccess(copyButton, "Disalin!");
+            })
+            .catch((err) => {
+              console.warn("Async clipboard API failed, trying fallback:", err);
+              try {
+                const textArea = document.createElement("textarea");
+                textArea.value = parsedJsonString;
+                textArea.style.position = "fixed";
+                textArea.style.top = "-9999px";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand("copy");
+                document.body.removeChild(textArea);
+                showCopySuccess(copyButton, "Disalin!");
+              } catch (fallbackErr) {
+                console.error("Fallback copy method failed:", fallbackErr);
+                copyButton.textContent = "Gagal Menyalin!";
+                copyButton.classList.add("bg-red-600");
+                setTimeout(() => {
+                  copyButton.textContent = "Copy JSON";
+                  copyButton.classList.remove("bg-red-600");
+                }, 2000);
+              }
+            });
+        });
+
+        document
+          .getElementById("expandButton")
+          .addEventListener("click", () => {
+            jsonOutput
+              .querySelectorAll("details")
+              .forEach((d) => (d.open = true));
+          });
+
+        document
+          .getElementById("collapseButton")
+          .addEventListener("click", () => {
+            jsonOutput
+              .querySelectorAll("details")
+              .forEach((d) => (d.open = false));
+          });
+
+        function showCopySuccess(button, message) {
+          const originalText = button.textContent;
+          const originalClasses = [...button.classList];
+          button.textContent = message;
+          button.classList.remove(
+            "bg-gray-200",
+            "hover:bg-gray-300",
+            "bg-blue-100",
+            "hover:bg-blue-200"
+          );
+          button.classList.add(
+            "bg-green-500",
+            "hover:bg-green-600",
+            "text-white"
+          );
+          setTimeout(() => {
+            button.textContent = originalText;
+            button.className = originalClasses.join(" ");
+          }, 2000);
+        }
+
+        function createJsonTree(data) {
+          const container = document.createElement("div");
+          container.className = "json-viewer";
+
+          for (const key in data) {
+            if (Object.prototype.hasOwnProperty.call(data, key)) {
+              container.appendChild(createNode(key, data[key], 0));
+            }
+          }
+          return container;
+        }
+
+        function createNode(key, value, level) {
+          const element = document.createElement("div");
+
+          if (key) {
+            const keySpan = document.createElement("span");
+            keySpan.className = "key";
+            keySpan.textContent = `"${key}": `;
+            element.appendChild(keySpan);
+          }
+
+          if (typeof value === "object" && value !== null) {
+            const details = document.createElement("details");
+            if (level < 2) {
+              // Auto-expand first two levels
+              details.open = true;
+            }
+
+            const summary = document.createElement("summary");
+            if (key) {
+              const summaryKeySpan = document.createElement("span");
+              summaryKeySpan.className = "key";
+              summaryKeySpan.textContent = `"${key}": `;
+              summary.appendChild(summaryKeySpan);
+            }
+
+            const bracketOpen = document.createElement("span");
+            const isArray = Array.isArray(value);
+            bracketOpen.textContent = isArray ? "[" : "{";
+            summary.appendChild(bracketOpen);
+
+            const contentDiv = document.createElement("div");
+
+            if (isArray) {
+              value.forEach((item) => {
+                contentDiv.appendChild(createNode(null, item, level + 1));
+              });
+            } else {
+              for (const subKey in value) {
+                if (Object.prototype.hasOwnProperty.call(value, subKey)) {
+                  contentDiv.appendChild(
+                    createNode(subKey, value[subKey], level + 1)
+                  );
+                }
+              }
+            }
+
+            details.appendChild(summary);
+            details.appendChild(contentDiv);
+
+            const bracketClose = document.createElement("span");
+            bracketClose.textContent = isArray ? "]" : "}";
+            details.appendChild(bracketClose);
+
+            return details;
+          } else {
+            const valueSpan = document.createElement("span");
+            let type = typeof value;
+            if (value === null) type = "null";
+
+            valueSpan.className = type;
+            valueSpan.textContent = JSON.stringify(value);
+            element.appendChild(valueSpan);
+          }
+          return element;
+        }
+      });
     </script>
-</body>
+  </body>
 </html>
