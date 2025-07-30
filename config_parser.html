@@ -30,83 +30,133 @@
       }
       /* Styling for JSON Tree View */
       .json-viewer {
-        font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono",
-          "Consolas", "Courier New", monospace;
+        font-family: "Menlo", "Monaco", "Consolas", monospace;
         font-size: 0.875rem;
         line-height: 1.5;
+        color: #374151;
         background: #ffffff;
-        color: #1f2937;
+        border-radius: 0.5rem;
+        padding: 1rem;
       }
-      .json-viewer details {
+
+      .json-node {
         position: relative;
+        margin: 0;
+        padding: 0;
       }
-      .json-viewer summary {
-        cursor: pointer;
-        outline: none;
-        list-style: none;
+
+      .json-node-content {
         display: flex;
         align-items: center;
         padding: 2px 0;
-        user-select: none;
+        border-radius: 3px;
+        transition: background-color 0.15s ease;
       }
-      .json-viewer summary::-webkit-details-marker {
-        display: none;
+
+      .json-node-content:hover {
+        background-color: #f8fafc;
       }
-      .json-viewer summary::marker {
-        display: none;
-      }
-      .json-viewer summary:hover {
-        background-color: rgba(59, 130, 246, 0.05);
-      }
-      .json-viewer .expand-icon {
+
+      .json-toggle {
         width: 12px;
         height: 12px;
         margin-right: 6px;
-        color: #6b7280;
-        font-size: 10px;
+        cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        font-size: 10px;
+        color: #6b7280;
+        user-select: none;
         flex-shrink: 0;
       }
-      .json-viewer .key {
-        color: #991b1b; /* Red-800 */
-        font-weight: 500;
+
+      .json-toggle:hover {
+        color: #374151;
       }
-      .json-viewer .string {
+
+      .json-toggle.expanded::before {
+        content: "▼";
+      }
+
+      .json-toggle.collapsed::before {
+        content: "▶";
+      }
+
+      .json-toggle.leaf::before {
+        content: "";
+      }
+
+      .json-key {
+        color: #7c3aed; /* Purple-600 */
+        font-weight: 500;
+        margin-right: 4px;
+      }
+
+      .json-separator {
+        color: #6b7280;
+        margin-right: 4px;
+      }
+
+      .json-value {
+        font-weight: 400;
+      }
+
+      .json-value.string {
         color: #059669; /* Emerald-600 */
       }
-      .json-viewer .number {
+
+      .json-value.number {
         color: #2563eb; /* Blue-600 */
       }
-      .json-viewer .boolean {
-        color: #7c3aed; /* Violet-600 */
-        font-weight: 500;
+
+      .json-value.boolean {
+        color: #dc2626; /* Red-600 */
       }
-      .json-viewer .null {
+
+      .json-value.null {
         color: #6b7280; /* Gray-500 */
         font-style: italic;
       }
-      .json-viewer .type-indicator {
+
+      .json-bracket {
         color: #f59e0b; /* Amber-500 */
         font-weight: 500;
-        margin-left: 4px;
+        font-style: italic;
       }
-      .json-viewer .array-index {
-        color: #6366f1; /* Indigo-500 */
+
+      .json-count {
+        color: #f97316; /* Orange-500 */
+        font-size: 0.8em;
+        margin-left: 4px;
         font-weight: 500;
       }
-      .json-viewer .tree-line {
-        position: absolute;
-        left: 6px;
-        top: 20px;
-        bottom: 0;
-        width: 1px;
-        background-color: #e5e7eb;
-      }
-      .json-viewer .content {
-        margin-left: 18px;
+
+      .json-children {
+        margin-left: 16px;
+        border-left: 1px solid #d1d5db;
+        padding-left: 8px;
+        display: none;
         position: relative;
+      }
+
+      .json-children::before {
+        content: "";
+        position: absolute;
+        left: -1px;
+        top: 0;
+        bottom: 0;
+        border-left: 1px solid #d1d5db;
+      }
+
+      .json-children.expanded {
+        display: block;
+      }
+
+      .json-array-index {
+        color: #6366f1; /* Indigo-500 */
+        font-weight: 500;
+        margin-right: 4px;
       }
     </style>
   </head>
@@ -202,7 +252,17 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <p class="mt-2">Parsing...</p>
+            <p id="progress-text" class="mt-2">Parsing...</p>
+            <div
+              class="mt-3 w-full bg-gray-200 rounded-full h-2 hidden"
+              id="progress-bar"
+            >
+              <div
+                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                id="progress-fill"
+                style="width: 0%"
+              ></div>
+            </div>
           </div>
           <div
             id="jsonOutput"
@@ -1160,6 +1220,17 @@
         const fileInput = document.getElementById("fileInput");
 
         let parsedJsonString = "";
+        let parseTimeout = null;
+
+        // Debounced parse function
+        function debouncedParse() {
+          if (parseTimeout) {
+            clearTimeout(parseTimeout);
+          }
+          parseTimeout = setTimeout(() => {
+            parseButton.click();
+          }, 1000); // Wait 1 second after user stops typing
+        }
 
         // Pre-fill the textarea with the provided config for convenience
         fetch(
@@ -1194,13 +1265,14 @@
               document.getElementById("expandButton").disabled = false;
               document.getElementById("collapseButton").disabled = false;
 
-              // Render the JSON Tree
+              // Render the JSON Tree with batching
               jsonOutput.innerHTML = ""; // Clear previous content
-              jsonOutput.appendChild(createJsonTree(config));
+              renderJsonTreeAsync(config, jsonOutput).then(() => {
+                spinner.classList.add("hidden");
+              });
             } catch (error) {
               jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
               console.error("Parsing Error:", error);
-            } finally {
               spinner.classList.add("hidden");
             }
           }, 50);
@@ -1208,6 +1280,13 @@
 
         uploadButton.addEventListener("click", () => {
           fileInput.click();
+        });
+
+        // Auto-parse on input change with debouncing
+        iniInput.addEventListener("input", () => {
+          if (iniInput.value.trim()) {
+            debouncedParse();
+          }
         });
 
         fileInput.addEventListener("change", (event) => {
@@ -1260,16 +1339,32 @@
           .getElementById("expandButton")
           .addEventListener("click", () => {
             jsonOutput
-              .querySelectorAll("details")
-              .forEach((d) => (d.open = true));
+              .querySelectorAll(".json-children")
+              .forEach((children) => {
+                children.classList.add("expanded");
+              });
+            jsonOutput.querySelectorAll(".json-toggle").forEach((toggle) => {
+              if (!toggle.classList.contains("leaf")) {
+                toggle.classList.remove("collapsed");
+                toggle.classList.add("expanded");
+              }
+            });
           });
 
         document
           .getElementById("collapseButton")
           .addEventListener("click", () => {
             jsonOutput
-              .querySelectorAll("details")
-              .forEach((d) => (d.open = false));
+              .querySelectorAll(".json-children")
+              .forEach((children) => {
+                children.classList.remove("expanded");
+              });
+            jsonOutput.querySelectorAll(".json-toggle").forEach((toggle) => {
+              if (!toggle.classList.contains("leaf")) {
+                toggle.classList.remove("expanded");
+                toggle.classList.add("collapsed");
+              }
+            });
           });
 
         function showCopySuccess(button, message) {
@@ -1293,143 +1388,406 @@
           }, 2000);
         }
 
+        async function renderJsonTreeAsync(data, container) {
+          const progressText = document.getElementById("progress-text");
+          const progressBar = document.getElementById("progress-bar");
+          const progressFill = document.getElementById("progress-fill");
+
+          progressText.textContent = "Rendering JSON tree...";
+          progressBar.classList.remove("hidden");
+
+          const viewerContainer = document.createElement("div");
+          viewerContainer.className = "json-viewer";
+          container.appendChild(viewerContainer);
+
+          if (typeof data === "object" && data !== null) {
+            const isArray = Array.isArray(data);
+            if (isArray) {
+              await renderItemsBatchWithProgress(
+                data,
+                viewerContainer,
+                0,
+                true,
+                progressText,
+                progressFill
+              );
+            } else {
+              const keys = Object.keys(data);
+              await renderObjectBatchWithProgress(
+                data,
+                keys,
+                viewerContainer,
+                0,
+                false,
+                progressText,
+                progressFill
+              );
+            }
+          } else {
+            viewerContainer.appendChild(createNode(null, data, 0, false, true));
+          }
+
+          progressBar.classList.add("hidden");
+          progressFill.style.width = "0%";
+        }
+
+        async function renderItemsBatchWithProgress(
+          items,
+          container,
+          level,
+          isArrayItem,
+          progressText,
+          progressFill
+        ) {
+          const BATCH_SIZE = 25; // Render 25 items at a time for better responsiveness
+          const total = items.length;
+
+          for (let i = 0; i < total; i += BATCH_SIZE) {
+            const batch = items.slice(i, Math.min(i + BATCH_SIZE, total));
+            const fragment = document.createDocumentFragment();
+
+            batch.forEach((item, batchIndex) => {
+              const actualIndex = i + batchIndex;
+              const isLast = actualIndex === total - 1;
+              const key = isArrayItem
+                ? `[${actualIndex}]`
+                : actualIndex.toString();
+              fragment.appendChild(
+                createNode(key, item, level, isArrayItem, isLast)
+              );
+            });
+
+            container.appendChild(fragment);
+
+            // Update progress
+            const progress = Math.min(100, ((i + BATCH_SIZE) / total) * 100);
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `Rendering... ${Math.floor(progress)}%`;
+
+            // Yield to browser to prevent blocking
+            if (i + BATCH_SIZE < total) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+        }
+
+        async function renderObjectBatchWithProgress(
+          data,
+          keys,
+          container,
+          level,
+          isArrayItem,
+          progressText,
+          progressFill
+        ) {
+          const BATCH_SIZE = 25; // Render 25 keys at a time for better responsiveness
+          const total = keys.length;
+
+          for (let i = 0; i < total; i += BATCH_SIZE) {
+            const batch = keys.slice(i, Math.min(i + BATCH_SIZE, total));
+            const fragment = document.createDocumentFragment();
+
+            batch.forEach((key, batchIndex) => {
+              const actualIndex = i + batchIndex;
+              const isLast = actualIndex === total - 1;
+              fragment.appendChild(
+                createNode(key, data[key], level, isArrayItem, isLast)
+              );
+            });
+
+            container.appendChild(fragment);
+
+            // Update progress
+            const progress = Math.min(100, ((i + BATCH_SIZE) / total) * 100);
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `Rendering... ${Math.floor(progress)}%`;
+
+            // Yield to browser to prevent blocking
+            if (i + BATCH_SIZE < total) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+        }
+
+        async function renderItemsBatch(items, container, level, isArrayItem) {
+          const BATCH_SIZE = 50; // Render 50 items at a time
+          const total = items.length;
+
+          for (let i = 0; i < total; i += BATCH_SIZE) {
+            const batch = items.slice(i, Math.min(i + BATCH_SIZE, total));
+            const fragment = document.createDocumentFragment();
+
+            batch.forEach((item, batchIndex) => {
+              const actualIndex = i + batchIndex;
+              const isLast = actualIndex === total - 1;
+              const key = isArrayItem
+                ? `[${actualIndex}]`
+                : actualIndex.toString();
+              fragment.appendChild(
+                createNode(key, item, level, isArrayItem, isLast)
+              );
+            });
+
+            container.appendChild(fragment);
+
+            // Yield to browser to prevent blocking
+            if (i + BATCH_SIZE < total) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+        }
+
+        async function renderObjectBatch(
+          data,
+          keys,
+          container,
+          level,
+          isArrayItem
+        ) {
+          const BATCH_SIZE = 50; // Render 50 keys at a time
+          const total = keys.length;
+
+          for (let i = 0; i < total; i += BATCH_SIZE) {
+            const batch = keys.slice(i, Math.min(i + BATCH_SIZE, total));
+            const fragment = document.createDocumentFragment();
+
+            batch.forEach((key, batchIndex) => {
+              const actualIndex = i + batchIndex;
+              const isLast = actualIndex === total - 1;
+              fragment.appendChild(
+                createNode(key, data[key], level, isArrayItem, isLast)
+              );
+            });
+
+            container.appendChild(fragment);
+
+            // Yield to browser to prevent blocking
+            if (i + BATCH_SIZE < total) {
+              await new Promise((resolve) => setTimeout(resolve, 0));
+            }
+          }
+        }
+
         function createJsonTree(data) {
           const container = document.createElement("div");
           container.className = "json-viewer";
 
-          // Create root node
-          if (Array.isArray(data)) {
-            container.appendChild(createNode("[0]", data, -1, true));
-          } else {
-            for (const key in data) {
-              if (Object.prototype.hasOwnProperty.call(data, key)) {
-                container.appendChild(createNode(key, data[key], 0, false));
-              }
-            }
-          }
-
-          return container;
-        }
-
-        function createNode(key, value, level, isArrayItem = false) {
-          if (typeof value === "object" && value !== null) {
-            const details = document.createElement("details");
-            details.className = "json-node";
-            if (level < 2) {
-              // Auto-expand first two levels
-              details.open = true;
-            }
-
-            const summary = document.createElement("summary");
-
-            // Add expand/collapse icon
-            const expandIcon = document.createElement("span");
-            expandIcon.className = "expand-icon";
-            expandIcon.textContent = "▼";
-            summary.appendChild(expandIcon);
-
-            // Add key
-            const keySpan = document.createElement("span");
-            keySpan.className = isArrayItem ? "array-index" : "key";
-            keySpan.textContent = isArrayItem ? key : `"${key}"`;
-            summary.appendChild(keySpan);
-
-            const colon = document.createElement("span");
-            colon.textContent = " : ";
-            summary.appendChild(colon);
-
-            // Add type indicator
-            const isArray = Array.isArray(value);
-            const typeSpan = document.createElement("span");
-            typeSpan.className = "type-indicator";
-
+          if (typeof data === "object" && data !== null) {
+            const isArray = Array.isArray(data);
             if (isArray) {
-              typeSpan.textContent = `array [${value.length}]`;
-            } else {
-              const keyCount = Object.keys(value).length;
-              typeSpan.textContent = `object {${keyCount}}`;
-            }
-            summary.appendChild(typeSpan);
-
-            // Content container
-            const contentDiv = document.createElement("div");
-            contentDiv.className = "content";
-
-            // Add tree line for nested items
-            if (level > 1) {
-              const treeLine = document.createElement("div");
-              treeLine.className = "tree-line";
-              contentDiv.appendChild(treeLine);
-            }
-
-            if (isArray) {
-              value.forEach((item, index) => {
-                contentDiv.appendChild(
-                  createNode(`[${index}]`, item, level + 1, true)
+              data.forEach((item, index) => {
+                const isLast = index === data.length - 1;
+                container.appendChild(
+                  createNode(`[${index}]`, item, 0, true, isLast)
                 );
               });
             } else {
-              for (const subKey in value) {
-                if (Object.prototype.hasOwnProperty.call(value, subKey)) {
-                  contentDiv.appendChild(
-                    createNode(subKey, value[subKey], level + 1, false)
-                  );
-                }
-              }
+              const keys = Object.keys(data);
+              keys.forEach((key, index) => {
+                const isLast = index === keys.length - 1;
+                container.appendChild(
+                  createNode(key, data[key], 0, false, isLast)
+                );
+              });
+            }
+          } else {
+            container.appendChild(createNode(null, data, 0, false, true));
+          }
+          return container;
+        }
+
+        function createNode(key, value, level, isArrayItem, isLast) {
+          const nodeElement = document.createElement("div");
+          nodeElement.className = "json-node";
+
+          const contentElement = document.createElement("div");
+          contentElement.className = "json-node-content";
+
+          const isObject = typeof value === "object" && value !== null;
+          const isArray = Array.isArray(value);
+
+          // Toggle element
+          const toggle = document.createElement("span");
+          toggle.className = "json-toggle";
+
+          if (isObject) {
+            const count = isArray ? value.length : Object.keys(value).length;
+            toggle.className += " collapsed";
+
+            const keyElement = document.createElement("span");
+            if (isArrayItem) {
+              keyElement.className = "json-array-index";
+              keyElement.textContent = key;
+            } else if (key) {
+              keyElement.className = "json-key";
+              keyElement.textContent = `"${key}"`;
             }
 
-            details.appendChild(summary);
-            details.appendChild(contentDiv);
+            const separator = document.createElement("span");
+            separator.className = "json-separator";
+            separator.textContent = ":";
 
-            // Update expand icon based on state
-            details.addEventListener("toggle", function () {
-              expandIcon.textContent = this.open ? "▼" : "▶";
+            const typeIndicator = document.createElement("span");
+            typeIndicator.className = "json-bracket";
+
+            const countElement = document.createElement("span");
+            countElement.className = "json-count";
+
+            if (isArray) {
+              typeIndicator.textContent = "array";
+              countElement.textContent = `[${count}]`;
+            } else {
+              typeIndicator.textContent = "object";
+              countElement.textContent = `{${count}}`;
+            }
+
+            contentElement.appendChild(toggle);
+            if (key) {
+              contentElement.appendChild(keyElement);
+              contentElement.appendChild(separator);
+              contentElement.appendChild(document.createTextNode(" "));
+            }
+            contentElement.appendChild(typeIndicator);
+            contentElement.appendChild(document.createTextNode(" "));
+            contentElement.appendChild(countElement);
+
+            if (!isLast) {
+              const comma = document.createElement("span");
+              comma.className = "json-separator";
+              comma.textContent = ",";
+              contentElement.appendChild(comma);
+            }
+
+            // Children container
+            const childrenElement = document.createElement("div");
+            childrenElement.className = "json-children";
+            let childrenRendered = false;
+
+            nodeElement.appendChild(contentElement);
+            nodeElement.appendChild(childrenElement);
+
+            // Lazy render children function
+            const renderChildren = () => {
+              if (childrenRendered) return;
+              childrenRendered = true;
+
+              if (isArray) {
+                value.forEach((item, index) => {
+                  const isLastChild = index === value.length - 1;
+                  childrenElement.appendChild(
+                    createNode(`[${index}]`, item, level + 1, true, isLastChild)
+                  );
+                });
+              } else {
+                const keys = Object.keys(value);
+                keys.forEach((subKey, index) => {
+                  const isLastChild = index === keys.length - 1;
+                  childrenElement.appendChild(
+                    createNode(
+                      subKey,
+                      value[subKey],
+                      level + 1,
+                      false,
+                      isLastChild
+                    )
+                  );
+                });
+              }
+
+              // Add closing bracket
+              const closingElement = document.createElement("div");
+              closingElement.className = "json-node-content";
+              const closingBracket = document.createElement("span");
+              closingBracket.style.color = "#6b7280";
+              closingBracket.style.fontWeight = "500";
+              closingBracket.textContent = isArray ? "]" : "}";
+
+              const emptyToggle = document.createElement("span");
+              emptyToggle.className = "json-toggle leaf";
+              closingElement.appendChild(emptyToggle);
+              closingElement.appendChild(closingBracket);
+
+              if (!isLast) {
+                const comma = document.createElement("span");
+                comma.className = "json-separator";
+                comma.textContent = ",";
+                closingElement.appendChild(comma);
+              }
+
+              childrenElement.appendChild(closingElement);
+            };
+
+            // Toggle functionality
+            toggle.addEventListener("click", () => {
+              const isExpanded = childrenElement.classList.contains("expanded");
+              if (isExpanded) {
+                childrenElement.classList.remove("expanded");
+                toggle.classList.remove("expanded");
+                toggle.classList.add("collapsed");
+              } else {
+                renderChildren(); // Lazy render on first expand
+                childrenElement.classList.add("expanded");
+                toggle.classList.remove("collapsed");
+                toggle.classList.add("expanded");
+              }
             });
 
-            // Set initial icon state
-            expandIcon.textContent = details.open ? "▼" : "▶";
-
-            return details;
+            // Auto-expand only first level for better performance
+            if (level < 1) {
+              renderChildren();
+              childrenElement.classList.add("expanded");
+              toggle.classList.remove("collapsed");
+              toggle.classList.add("expanded");
+            }
           } else {
             // Leaf node
-            const element = document.createElement("div");
-            element.style.padding = "2px 0";
-            element.style.display = "flex";
-            element.style.alignItems = "center";
+            toggle.className += " leaf";
 
-            // Add spacing for alignment
-            const spacer = document.createElement("span");
-            spacer.style.width = "18px";
-            spacer.style.flexShrink = "0";
-            element.appendChild(spacer);
-
-            // Add key
-            const keySpan = document.createElement("span");
-            keySpan.className = isArrayItem ? "array-index" : "key";
-            keySpan.textContent = isArrayItem ? key : `"${key}"`;
-            element.appendChild(keySpan);
-
-            const colon = document.createElement("span");
-            colon.textContent = " : ";
-            element.appendChild(colon);
-
-            // Add value
-            const valueSpan = document.createElement("span");
-            let type = typeof value;
-            if (value === null) {
-              type = "null";
-              valueSpan.textContent = "null";
-            } else if (type === "string") {
-              valueSpan.textContent = `"${value}"`;
-            } else {
-              valueSpan.textContent = String(value);
+            const keyElement = document.createElement("span");
+            if (isArrayItem) {
+              keyElement.className = "json-array-index";
+              keyElement.textContent = key;
+            } else if (key) {
+              keyElement.className = "json-key";
+              keyElement.textContent = `"${key}"`;
             }
 
-            valueSpan.className = type;
-            element.appendChild(valueSpan);
+            const separator = document.createElement("span");
+            separator.className = "json-separator";
+            separator.textContent = ":";
 
-            return element;
+            const valueElement = document.createElement("span");
+            valueElement.className = "json-value";
+
+            let type = typeof value;
+            if (value === null) type = "null";
+            valueElement.classList.add(type);
+
+            if (type === "string") {
+              valueElement.textContent = `"${value}"`;
+            } else {
+              valueElement.textContent = String(value);
+            }
+
+            contentElement.appendChild(toggle);
+            if (key) {
+              contentElement.appendChild(keyElement);
+              contentElement.appendChild(separator);
+              contentElement.appendChild(document.createTextNode(" "));
+            }
+            contentElement.appendChild(valueElement);
+
+            if (!isLast) {
+              const comma = document.createElement("span");
+              comma.className = "json-separator";
+              comma.textContent = ",";
+              contentElement.appendChild(comma);
+            }
+
+            nodeElement.appendChild(contentElement);
           }
+
+          return nodeElement;
         }
       });
     </script>
