@@ -30,43 +30,83 @@
       }
       /* Styling for JSON Tree View */
       .json-viewer {
-        font-family: "Menlo", "Consolas", monospace;
-        font-size: 0.9em;
-        line-height: 1.6;
+        font-family: "SF Mono", "Monaco", "Cascadia Code", "Roboto Mono",
+          "Consolas", "Courier New", monospace;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        background: #ffffff;
+        color: #1f2937;
       }
       .json-viewer details {
-        padding-left: 1.5rem;
-        border-left: 1px solid #e2e8f0; /* slate-200 */
+        position: relative;
       }
       .json-viewer summary {
         cursor: pointer;
-        display: block; /* Makes the whole line clickable */
         outline: none;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        padding: 2px 0;
+        user-select: none;
+      }
+      .json-viewer summary::-webkit-details-marker {
+        display: none;
+      }
+      .json-viewer summary::marker {
+        display: none;
       }
       .json-viewer summary:hover {
-        color: #2563eb;
+        background-color: rgba(59, 130, 246, 0.05);
+      }
+      .json-viewer .expand-icon {
+        width: 12px;
+        height: 12px;
+        margin-right: 6px;
+        color: #6b7280;
+        font-size: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
       }
       .json-viewer .key {
-        color: #9d174d; /* Pink-700 */
-        font-weight: 600;
+        color: #991b1b; /* Red-800 */
+        font-weight: 500;
       }
       .json-viewer .string {
-        color: #16a34a; /* Green-600 */
+        color: #059669; /* Emerald-600 */
       }
       .json-viewer .number {
         color: #2563eb; /* Blue-600 */
       }
-      .json-viewer .boolean,
+      .json-viewer .boolean {
+        color: #7c3aed; /* Violet-600 */
+        font-weight: 500;
+      }
       .json-viewer .null {
-        color: #ca8a04; /* Yellow-600 */
-      }
-      .json-viewer .comment {
-        color: #64748b; /* Slate-500 */
+        color: #6b7280; /* Gray-500 */
         font-style: italic;
-        margin-left: 1rem;
       }
-      .json-viewer summary::marker {
-        color: #94a3b8; /* Slate-400 */
+      .json-viewer .type-indicator {
+        color: #f59e0b; /* Amber-500 */
+        font-weight: 500;
+        margin-left: 4px;
+      }
+      .json-viewer .array-index {
+        color: #6366f1; /* Indigo-500 */
+        font-weight: 500;
+      }
+      .json-viewer .tree-line {
+        position: absolute;
+        left: 6px;
+        top: 20px;
+        bottom: 0;
+        width: 1px;
+        background-color: #e5e7eb;
+      }
+      .json-viewer .content {
+        margin-left: 18px;
+        position: relative;
       }
     </style>
   </head>
@@ -1257,55 +1297,82 @@
           const container = document.createElement("div");
           container.className = "json-viewer";
 
-          for (const key in data) {
-            if (Object.prototype.hasOwnProperty.call(data, key)) {
-              container.appendChild(createNode(key, data[key], 0));
+          // Create root node
+          if (Array.isArray(data)) {
+            container.appendChild(createNode("[0]", data, -1, true));
+          } else {
+            for (const key in data) {
+              if (Object.prototype.hasOwnProperty.call(data, key)) {
+                container.appendChild(createNode(key, data[key], 0, false));
+              }
             }
           }
+
           return container;
         }
 
-        function createNode(key, value, level) {
-          const element = document.createElement("div");
-
-          if (key) {
-            const keySpan = document.createElement("span");
-            keySpan.className = "key";
-            keySpan.textContent = `"${key}": `;
-            element.appendChild(keySpan);
-          }
-
+        function createNode(key, value, level, isArrayItem = false) {
           if (typeof value === "object" && value !== null) {
             const details = document.createElement("details");
+            details.className = "json-node";
             if (level < 2) {
               // Auto-expand first two levels
               details.open = true;
             }
 
             const summary = document.createElement("summary");
-            if (key) {
-              const summaryKeySpan = document.createElement("span");
-              summaryKeySpan.className = "key";
-              summaryKeySpan.textContent = `"${key}": `;
-              summary.appendChild(summaryKeySpan);
-            }
 
-            const bracketOpen = document.createElement("span");
+            // Add expand/collapse icon
+            const expandIcon = document.createElement("span");
+            expandIcon.className = "expand-icon";
+            expandIcon.textContent = "▼";
+            summary.appendChild(expandIcon);
+
+            // Add key
+            const keySpan = document.createElement("span");
+            keySpan.className = isArrayItem ? "array-index" : "key";
+            keySpan.textContent = isArrayItem ? key : `"${key}"`;
+            summary.appendChild(keySpan);
+
+            const colon = document.createElement("span");
+            colon.textContent = " : ";
+            summary.appendChild(colon);
+
+            // Add type indicator
             const isArray = Array.isArray(value);
-            bracketOpen.textContent = isArray ? "[" : "{";
-            summary.appendChild(bracketOpen);
-
-            const contentDiv = document.createElement("div");
+            const typeSpan = document.createElement("span");
+            typeSpan.className = "type-indicator";
 
             if (isArray) {
-              value.forEach((item) => {
-                contentDiv.appendChild(createNode(null, item, level + 1));
+              typeSpan.textContent = `array [${value.length}]`;
+            } else {
+              const keyCount = Object.keys(value).length;
+              typeSpan.textContent = `object {${keyCount}}`;
+            }
+            summary.appendChild(typeSpan);
+
+            // Content container
+            const contentDiv = document.createElement("div");
+            contentDiv.className = "content";
+
+            // Add tree line for nested items
+            if (level > 1) {
+              const treeLine = document.createElement("div");
+              treeLine.className = "tree-line";
+              contentDiv.appendChild(treeLine);
+            }
+
+            if (isArray) {
+              value.forEach((item, index) => {
+                contentDiv.appendChild(
+                  createNode(`[${index}]`, item, level + 1, true)
+                );
               });
             } else {
               for (const subKey in value) {
                 if (Object.prototype.hasOwnProperty.call(value, subKey)) {
                   contentDiv.appendChild(
-                    createNode(subKey, value[subKey], level + 1)
+                    createNode(subKey, value[subKey], level + 1, false)
                   );
                 }
               }
@@ -1314,21 +1381,55 @@
             details.appendChild(summary);
             details.appendChild(contentDiv);
 
-            const bracketClose = document.createElement("span");
-            bracketClose.textContent = isArray ? "]" : "}";
-            details.appendChild(bracketClose);
+            // Update expand icon based on state
+            details.addEventListener("toggle", function () {
+              expandIcon.textContent = this.open ? "▼" : "▶";
+            });
+
+            // Set initial icon state
+            expandIcon.textContent = details.open ? "▼" : "▶";
 
             return details;
           } else {
+            // Leaf node
+            const element = document.createElement("div");
+            element.style.padding = "2px 0";
+            element.style.display = "flex";
+            element.style.alignItems = "center";
+
+            // Add spacing for alignment
+            const spacer = document.createElement("span");
+            spacer.style.width = "18px";
+            spacer.style.flexShrink = "0";
+            element.appendChild(spacer);
+
+            // Add key
+            const keySpan = document.createElement("span");
+            keySpan.className = isArrayItem ? "array-index" : "key";
+            keySpan.textContent = isArrayItem ? key : `"${key}"`;
+            element.appendChild(keySpan);
+
+            const colon = document.createElement("span");
+            colon.textContent = " : ";
+            element.appendChild(colon);
+
+            // Add value
             const valueSpan = document.createElement("span");
             let type = typeof value;
-            if (value === null) type = "null";
+            if (value === null) {
+              type = "null";
+              valueSpan.textContent = "null";
+            } else if (type === "string") {
+              valueSpan.textContent = `"${value}"`;
+            } else {
+              valueSpan.textContent = String(value);
+            }
 
             valueSpan.className = type;
-            valueSpan.textContent = JSON.stringify(value);
             element.appendChild(valueSpan);
+
+            return element;
           }
-          return element;
         }
       });
     </script>
