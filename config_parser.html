@@ -204,7 +204,12 @@
                         if (!labelOrVar) break;
                         if (variable) {
                             element = { type: 'field', label: labelOrVar.replace(/"/g, ''), variable };
-                            if (rest.length > 1 && rest[1]) element.condition = rest[1];
+                            if (rest[0] && rest[0] !== '{}') {
+                                element.condition = rest[0];
+                            }
+                            if (rest[1] && rest[1] !== '{}') {
+                                element.highlightCondition = rest[1];
+                            }
                         } else {
                             element = { type: 'label', text: labelOrVar.replace(/"/g, '') };
                             if(labelOrVar.startsWith('!')) element.style = 'warning';
@@ -249,6 +254,34 @@
                             this.lastUserDefinedElement.options.push({ label: optLabel.replace(/"/g, ''), settings });
                         }
                         break;
+                    // --- BUG FIX START ---
+                    case 'liveGraph':
+                        const [graphId, graphTitle] = parts;
+                        element = { 
+                            type: 'liveGraph', 
+                            id: graphId, 
+                            title: graphTitle.replace(/"/g, ''),
+                            lines: [] 
+                        };
+                        if (this.currentUserDefinedDialog) this.currentUserDefinedDialog.content.push(element);
+                        this.lastUserDefinedElement = element; // Set this as the last element to attach graphLines
+                        break;
+                    case 'graphLine':
+                        // Ensure the last element was a liveGraph
+                        if (this.lastUserDefinedElement && this.lastUserDefinedElement.type === 'liveGraph') {
+                            const line = {
+                                variable: parts[0],
+                                units: parts[1] ? parts[1].replace(/"/g, '') : null,
+                                low: parts[2] ? parseFloat(parts[2]) : null,
+                                high: parts[3] ? parseFloat(parts[3]) : null,
+                                // auto values can exist
+                                lowColor: parts[4] || null,
+                                highColor: parts[5] || null,
+                            };
+                            this.lastUserDefinedElement.lines.push(line);
+                        }
+                        break;
+                    // --- BUG FIX END ---
                 }
             }
 
@@ -466,7 +499,6 @@
             const spinner = document.getElementById('spinner');
             const copyButton = document.getElementById('copyButton');
             
-            // --- MODIFICATION: Variable to hold parsed JSON string ---
             let parsedJsonString = '';
 
             // Pre-fill the textarea with the provided config for convenience
@@ -488,16 +520,12 @@
                 copyButton.disabled = true;
                 parsedJsonString = ''; // Reset on new parse
 
-                // Use setTimeout to allow the UI to update and show the spinner
                 setTimeout(() => {
                     try {
                         const parser = new SpeeduinoIniParser();
                         const config = parser.parse(iniContent);
-                        // --- MODIFICATION: Store result and enable copy button immediately ---
                         parsedJsonString = JSON.stringify(config, null, 2);
                         copyButton.disabled = false;
-                        
-                        // Now update the UI, which might be slow but doesn't block copying
                         jsonOutput.textContent = parsedJsonString;
                     } catch (error) {
                         jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
@@ -505,10 +533,9 @@
                     } finally {
                         spinner.classList.add('hidden');
                     }
-                }, 50); // Small delay
+                }, 50);
             });
 
-            // --- Copy Button Logic ---
             copyButton.addEventListener('click', () => {
                 if (!parsedJsonString) return;
 
