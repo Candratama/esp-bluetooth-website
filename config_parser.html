@@ -2465,12 +2465,9 @@
         updateFooterShortcuts();
         window.addEventListener("resize", updateFooterShortcuts);
 
-        // Auto-parse on input change with debouncing
+        // Update character count on input change (no auto-parsing for manual input)
         iniInput.addEventListener("input", () => {
           updateCharCount();
-          if (iniInput.value.trim()) {
-            debouncedParse();
-          }
         });
 
         // Initial character count
