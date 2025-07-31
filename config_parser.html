@@ -3,25 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Content Security Policy -->
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; 
-                   script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://gist.githubusercontent.com; 
-                   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
-                   font-src 'self' https://fonts.gstatic.com; 
-                   connect-src 'self' https://gist.githubusercontent.com;"
-    />
     <title>Speeduino INI Parser</title>
-    <!-- External dependencies with integrity checks -->
-    <!-- TODO: Add integrity hash for production use:
-         Get hash from: https://www.srihash.org/ with the URL below
-         Example: integrity="sha384-HASH_HERE" -->
-    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
-      crossorigin="anonymous"
     />
     <style>
       * {
@@ -1993,95 +1979,6 @@
         let parsedConfig = null;
         let filesProcessed = 0;
 
-        // Security utilities
-        function isValidUrl(string) {
-          try {
-            new URL(string);
-            return true;
-          } catch (_) {
-            return false;
-          }
-        }
-
-        function isAllowedDomain(url) {
-          const allowedDomains = [
-            "gist.githubusercontent.com",
-            "raw.githubusercontent.com",
-          ];
-          const urlObj = new URL(url);
-          return allowedDomains.includes(urlObj.hostname);
-        }
-
-        function fetchWithSecurity(url, options = {}) {
-          const timeout = options.timeout || 10000; // 10 seconds
-          const maxSize = options.maxSize || 5 * 1024 * 1024; // 5MB
-
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-          return fetch(url, {
-            ...options,
-            signal: controller.signal,
-            method: "GET",
-            mode: "cors",
-            cache: "no-store",
-            redirect: "follow",
-            referrerPolicy: "no-referrer",
-          })
-            .then((response) => {
-              clearTimeout(timeoutId);
-
-              if (!response.ok) {
-                throw new Error(
-                  `HTTP ${response.status}: ${response.statusText}`
-                );
-              }
-
-              const contentLength = response.headers.get("content-length");
-              if (contentLength && parseInt(contentLength) > maxSize) {
-                throw new Error(`Content too large: ${contentLength} bytes`);
-              }
-
-              return response.text().then((text) => {
-                if (text.length > maxSize) {
-                  throw new Error(`Content too large: ${text.length} bytes`);
-                }
-                return text;
-              });
-            })
-            .catch((error) => {
-              clearTimeout(timeoutId);
-              if (error.name === "AbortError") {
-                throw new Error("Request timeout");
-              }
-              throw error;
-            });
-        }
-
-        function sanitizeInput(input) {
-          if (typeof input !== "string") {
-            return "";
-          }
-
-          // Remove potential script tags and other dangerous elements
-          const sanitized = input
-            .replace(/<script[^>]*>.*?<\/script>/gis, "")
-            .replace(/<iframe[^>]*>.*?<\/iframe>/gis, "")
-            .replace(/<object[^>]*>.*?<\/object>/gis, "")
-            .replace(/<embed[^>]*>.*?<\/embed>/gis, "")
-            .replace(/javascript:/gi, "")
-            .replace(/vbscript:/gi, "")
-            .replace(/on\w+\s*=/gi, "");
-
-          // Limit size
-          const maxLength = 10 * 1024 * 1024; // 10MB
-          if (sanitized.length > maxLength) {
-            throw new Error(`Input too large: ${sanitized.length} characters`);
-          }
-
-          return sanitized;
-        }
-
         // Debounced parse function
         function debouncedParse() {
           if (parseTimeout) {
@@ -2433,27 +2330,16 @@
             ) {
               const reader = new FileReader();
               reader.onload = (e) => {
-                try {
-                  const sanitizedContent = sanitizeInput(e.target.result);
-                  if (index === 0) {
-                    iniInput.value = sanitizedContent;
-                  } else {
-                    iniInput.value += "\n\n" + sanitizedContent;
-                  }
-                  updateCharCount();
-
-                  if (index === files.length - 1) {
-                    setTimeout(() => parseButton.click(), 100);
-                  }
-                } catch (error) {
-                  showNotification(
-                    `File "${file.name}" content error: ${error.message}`,
-                    "error"
-                  );
+                if (index === 0) {
+                  iniInput.value = e.target.result;
+                } else {
+                  iniInput.value += "\n\n" + e.target.result;
                 }
-              };
-              reader.onerror = () => {
-                showNotification(`Failed to read file "${file.name}"`, "error");
+                updateCharCount();
+
+                if (index === files.length - 1) {
+                  setTimeout(() => parseButton.click(), 100);
+                }
               };
               reader.readAsText(file);
             } else {
@@ -2474,23 +2360,6 @@
           if (!iniContent) {
             jsonOutput.innerHTML =
               '<div class="text-center text-white/60 py-8"><span class="text-4xl mb-4 block">📄</span><p>Please paste your .ini content or drag & drop a file to get started.</p></div>';
-            return;
-          }
-
-          // Sanitize input before processing
-          let sanitizedContent;
-          try {
-            sanitizedContent = sanitizeInput(iniContent);
-          } catch (error) {
-            jsonOutput.innerHTML = `<div class="text-center text-red-400 py-8">
-              <span class="text-4xl mb-4 block">🚫</span>
-              <h3 class="text-lg font-semibold mb-2">Input Error</h3>
-              <p class="text-sm">${error.message}</p>
-            </div>`;
-            showNotification(
-              "Input validation failed: " + error.message,
-              "error"
-            );
             return;
           }
 
@@ -2516,7 +2385,7 @@
           setTimeout(() => {
             try {
               const parser = new SpeeduinoIniParser();
-              const config = parser.parse(sanitizedContent);
+              const config = parser.parse(iniContent);
               parsedConfig = config;
               parsedJsonString = JSON.stringify(config, null, 2);
 
@@ -2554,47 +2423,14 @@
                 );
               });
             } catch (error) {
-              // Enhanced error boundary with error reporting
-              const errorId = "ERR_" + Date.now();
-              const errorDetails = {
-                id: errorId,
-                message: error.message,
-                stack: error.stack,
-                timestamp: new Date().toISOString(),
-                inputLength: sanitizedContent?.length || 0,
-                userAgent: navigator.userAgent,
-              };
-
-              // Log error details for debugging
-              console.error("Parsing Error:", errorDetails);
-
-              // Display user-friendly error
-              const safeErrorMessage = error.message
-                .replace(/<[^>]*>/g, "") // Remove any HTML tags
-                .substring(0, 200); // Limit length
-
               jsonOutput.innerHTML = `<div class="text-center text-red-400 py-8">
                 <span class="text-4xl mb-4 block">❌</span>
                 <h3 class="text-lg font-semibold mb-2">Parsing Error</h3>
-                <p class="text-sm mb-4">${safeErrorMessage}</p>
-                <div class="text-xs text-white/60 mb-4">Error ID: ${errorId}</div>
+                <p class="text-sm">${error.message}</p>
                 <details class="mt-4 text-xs text-left">
-                  <summary class="cursor-pointer text-blue-300 hover:text-blue-100">
-                    Show Technical Details
-                  </summary>
-                  <div class="mt-2 p-3 bg-black/30 rounded border border-white/10">
-                    <div><strong>Time:</strong> ${errorDetails.timestamp}</div>
-                    <div><strong>Input Size:</strong> ${errorDetails.inputLength} characters</div>
-                    <div class="mt-2"><strong>Stack Trace:</strong></div>
-                    <pre class="mt-1 text-xs overflow-auto max-h-32">${error.stack}</pre>
-                  </div>
+                  <summary class="cursor-pointer">Show Details</summary>
+                  <pre class="mt-2 p-2 bg-black/20 rounded">${error.stack}</pre>
                 </details>
-                <div class="mt-4">
-                  <button onclick="location.reload()" 
-                          class="btn-secondary text-xs py-2 px-3">
-                    🔄 Refresh Page
-                  </button>
-                </div>
               </div>`;
 
               // Update status
@@ -2602,18 +2438,9 @@
               document.getElementById("input-status").className =
                 "status-indicator status-error";
 
-              // Reset UI state
+              console.error("Parsing Error:", error);
               spinner.classList.add("hidden");
-              copyButton.disabled = true;
-              document.getElementById("expandButton").disabled = true;
-              document.getElementById("collapseButton").disabled = true;
-              document.getElementById("downloadButton").disabled = true;
-              document.getElementById("searchInput").disabled = true;
-
-              showNotification(
-                `Parsing failed (${errorId}): ${safeErrorMessage}`,
-                "error"
-              );
+              showNotification("Failed to parse configuration", "error");
             }
           }, 50);
         });
@@ -2710,31 +2537,18 @@
             // Pre-fill with sample data if no external source
             if (iniInput.value.trim() === "") {
               showNotification("Loading sample configuration...", "info");
-
-              // Secure fetch with validation
-              const sampleUrl =
-                "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini";
-
-              // Validate URL
-              if (!isValidUrl(sampleUrl) || !isAllowedDomain(sampleUrl)) {
-                showNotification("Invalid or unauthorized URL", "error");
-                return;
-              }
-
-              // Fetch with timeout and size limits
-              fetchWithSecurity(sampleUrl)
+              // Load the external sample
+              fetch(
+                "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini"
+              )
+                .then((response) => response.text())
                 .then((text) => {
-                  const sanitizedText = sanitizeInput(text);
-                  iniInput.value = sanitizedText;
+                  iniInput.value = text;
                   updateCharCount();
                   parseButton.click();
                 })
-                .catch((error) => {
-                  console.error("Fetch error:", error);
-                  showNotification(
-                    "Failed to load sample file: " + error.message,
-                    "error"
-                  );
+                .catch(() => {
+                  showNotification("Failed to load sample file", "error");
                 });
             } else {
               showNotification("Clear current content first", "info");
