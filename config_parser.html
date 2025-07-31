@@ -3,30 +3,477 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Content Security Policy -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; 
+                   script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://gist.githubusercontent.com; 
+                   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+                   font-src 'self' https://fonts.gstatic.com; 
+                   connect-src 'self' https://gist.githubusercontent.com;"
+    />
     <title>Speeduino INI Parser</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- External dependencies with integrity checks -->
+    <!-- TODO: Add integrity hash for production use:
+         Get hash from: https://www.srihash.org/ with the URL below
+         Example: integrity="sha384-HASH_HERE" -->
+    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
+      crossorigin="anonymous"
     />
     <style>
+      * {
+        box-sizing: border-box;
+      }
+
       body {
         font-family: "Inter", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        margin: 0;
+        padding: 0;
       }
-      /* Simple scrollbar styling */
+
+      /* Glass morphism background */
+      .glass-bg {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Modern scrollbar styling */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f5f9; /* slate-100 */
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #94a3b8; /* slate-400 */
+        background: rgba(255, 255, 255, 0.1);
         border-radius: 4px;
       }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        transition: background 0.3s ease;
+      }
       ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; /* slate-500 */
+        background: rgba(255, 255, 255, 0.5);
+      }
+
+      /* Animations */
+      .fade-in {
+        animation: fadeIn 0.5s ease-in;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .slide-up {
+        animation: slideUp 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(50px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Button improvements */
+      .btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 12px 24px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 12px 24px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn-primary:active {
+        transform: translateY(0);
+      }
+
+      .btn-secondary {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        font-weight: 500;
+        padding: 8px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+
+      .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+      }
+
+      /* Input improvements */
+      .modern-input {
+        background: rgba(255, 255, 255, 0.9);
+        border: 2px solid transparent;
+        border-radius: 12px;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+      }
+
+      .modern-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        background: white;
+      }
+
+      /* Drag and drop styling */
+      .drag-drop-area {
+        border: 2px dashed rgba(255, 255, 255, 0.3);
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .drag-drop-area.drag-over {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+        transform: scale(1.02);
+      }
+
+      .drag-drop-area:hover {
+        border-color: rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      /* Search box for JSON */
+      .search-container {
+        position: relative;
+        margin-bottom: 1rem;
+      }
+
+      .search-input {
+        width: 100%;
+        padding: 10px 40px 10px 16px;
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid transparent;
+        border-radius: 25px;
+        font-size: 14px;
+        color: #1f2937; /* Dark grey text */
+        font-weight: 500;
+        transition: all 0.3s ease;
+      }
+
+      .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        background: white;
+        color: #111827; /* Darker text on focus */
+      }
+
+      .search-input::placeholder {
+        color: #6b7280; /* Medium grey for placeholder */
+        font-weight: 400;
+      }
+
+      .search-icon {
+        position: absolute;
+        right: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #4b5563; /* Darker grey for icon */
+        pointer-events: none;
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 20px;
+        height: 20px;
+      }
+
+      /* Search Navigation */
+      .search-navigation {
+        margin-top: 0.5rem;
+        padding: 0.5rem;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .search-navigation.hidden {
+        display: none;
+      }
+
+      /* Search Highlighting */
+      .search-highlight {
+        background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+        color: #000;
+        padding: 1px 2px;
+        border-radius: 3px;
+        font-weight: 600;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+
+      .search-current {
+        background: linear-gradient(
+          135deg,
+          #ef4444 0%,
+          #dc2626 100%
+        ) !important;
+        color: white !important;
+        padding: 2px 4px !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4) !important;
+        border: 2px solid #fca5a5 !important;
+        animation: pulse-highlight 2s ease-in-out;
+      }
+
+      @keyframes pulse-highlight {
+        0%,
+        100% {
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+        }
+        50% {
+          box-shadow: 0 4px 16px rgba(239, 68, 68, 0.6);
+        }
+      }
+
+      /* Search counter styling */
+      #searchCounter {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 500;
+        min-width: 60px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+      }
+
+      /* Navigation buttons */
+      #prevResult,
+      #nextResult {
+        min-width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+      }
+
+      #prevResult:hover,
+      #nextResult:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: scale(1.1);
+      }
+
+      /* Improved focus for search results */
+      .json-node:has(.search-current) {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: 6px;
+        padding: 4px;
+        margin: 2px 0;
+      }
+
+      /* High contrast mode improvements */
+      @media (prefers-contrast: high) {
+        .search-highlight {
+          background: #ffff00 !important;
+          color: #000000 !important;
+          border: 2px solid #000000 !important;
+        }
+
+        .search-current {
+          background: #ff0000 !important;
+          color: #ffffff !important;
+          border: 3px solid #ffffff !important;
+        }
+
+        .status-success {
+          background: #00ff00 !important;
+          color: #000000 !important;
+          border: 2px solid #000000 !important;
+          font-weight: 700 !important;
+        }
+
+        .status-error {
+          background: #ff0000 !important;
+          color: #ffffff !important;
+          border: 2px solid #ffffff !important;
+          font-weight: 700 !important;
+        }
+
+        .status-processing {
+          background: #0066ff !important;
+          color: #ffffff !important;
+          border: 2px solid #ffffff !important;
+          font-weight: 700 !important;
+        }
+      }
+
+      /* Tooltip */
+      .tooltip {
+        position: relative;
+        display: inline-block;
+      }
+
+      .tooltip .tooltip-text {
+        visibility: hidden;
+        width: 200px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        text-align: center;
+        border-radius: 8px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        backdrop-filter: blur(10px);
+      }
+
+      .tooltip:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+      }
+
+      /* Status indicators */
+      .status-indicator {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .status-success {
+        background: rgba(34, 197, 94, 0.15);
+        color: #065f46; /* Much darker green for better contrast */
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+      }
+
+      .status-error {
+        background: rgba(239, 68, 68, 0.15);
+        color: #7f1d1d; /* Much darker red for better contrast */
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+      }
+
+      .status-processing {
+        background: rgba(59, 130, 246, 0.15);
+        color: #1e3a8a; /* Much darker blue for better contrast */
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        font-weight: 600;
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
+      }
+
+      /* Modern progress bar */
+      .progress-container {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        overflow: hidden;
+        height: 8px;
+        position: relative;
+      }
+
+      .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 10px;
+        transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .progress-bar::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.3),
+          transparent
+        );
+        animation: shimmer 2s infinite;
+      }
+
+      @keyframes shimmer {
+        0% {
+          transform: translateX(-100%);
+        }
+        100% {
+          transform: translateX(100%);
+        }
+      }
+
+      /* Stats cards */
+      .stats-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 1rem;
+        text-align: center;
+        color: white;
+      }
+
+      .stats-number {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #fbbf24;
+      }
+
+      .stats-label {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
       /* Styling for JSON Tree View */
       .json-viewer {
@@ -158,116 +605,438 @@
         font-weight: 500;
         margin-right: 4px;
       }
+
+      /* Responsive Design */
+      @media (max-width: 1280px) {
+        .container {
+          padding: 1rem;
+        }
+
+        .glass-bg {
+          padding: 1rem;
+        }
+
+        .grid-cols-3 {
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .stats-card {
+          padding: 0.75rem;
+        }
+
+        .stats-number {
+          font-size: 1.25rem;
+        }
+
+        .btn-primary,
+        .btn-secondary {
+          padding: 10px 16px;
+          font-size: 0.875rem;
+        }
+
+        .search-input {
+          font-size: 16px; /* Prevent zoom on iOS */
+          color: #1f2937; /* Maintain dark text on mobile */
+        }
+
+        .search-input:focus {
+          color: #111827; /* Darker text on focus for mobile */
+        }
+
+        .search-icon {
+          right: 12px;
+          font-size: 14px;
+          width: 18px;
+          height: 18px;
+        }
+
+        .modern-input {
+          font-size: 16px; /* Prevent zoom on iOS */
+        }
+
+        .search-navigation {
+          padding: 0.25rem;
+        }
+
+        #searchCounter {
+          font-size: 10px;
+          min-width: 40px;
+        }
+
+        #prevResult,
+        #nextResult {
+          min-width: 24px;
+          height: 24px;
+          font-size: 12px;
+        }
+
+        #jsonOutput {
+          height: 300px !important;
+        }
+
+        .grid.grid-cols-1.xl\\:grid-cols-2 {
+          gap: 1rem;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .container {
+          padding: 0.5rem;
+        }
+
+        .flex-wrap .btn-secondary {
+          flex: 1;
+          min-width: 0;
+        }
+
+        .tooltip .tooltip-text {
+          width: 150px;
+          margin-left: -75px;
+          font-size: 10px;
+        }
+
+        .status-indicator {
+          font-size: 10px;
+          padding: 4px 8px;
+        }
+
+        .status-success {
+          color: #064e3b; /* Even darker green for mobile */
+          font-weight: 700;
+        }
+
+        .status-error {
+          color: #7c2d12; /* Even darker red for mobile */
+          font-weight: 700;
+        }
+
+        .status-processing {
+          color: #1e40af; /* Even darker blue for mobile */
+          font-weight: 700;
+        }
+      }
+
+      /* Focus styles for accessibility */
+      .btn-primary:focus,
+      .btn-secondary:focus,
+      .modern-input:focus,
+      .search-input:focus {
+        outline: 2px solid #fbbf24;
+        outline-offset: 2px;
+      }
+
+      /* Loading animation improvements */
+      .animate-pulse {
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      /* Dark mode styles */
+      .dark-mode {
+        --glass-bg: rgba(31, 41, 55, 0.3);
+        --text-primary: #f9fafb;
+        --text-secondary: rgba(249, 250, 251, 0.8);
+      }
+
+      /* High contrast mode */
+      @media (prefers-contrast: high) {
+        .glass-bg {
+          background: rgba(255, 255, 255, 0.95);
+          color: #000;
+        }
+
+        .btn-secondary {
+          background: rgba(255, 255, 255, 0.9);
+          color: #000;
+        }
+      }
+
+      /* Reduced motion */
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
     </style>
   </head>
-  <body class="bg-gray-100 text-gray-800">
+  <body>
     <div class="container mx-auto p-4 md:p-8">
-      <header class="text-center mb-8">
-        <h1 class="text-4xl font-bold text-gray-900">
-          Speeduino .ini Config Parser
-        </h1>
-        <p class="text-lg text-gray-600 mt-2">
-          Tempelkan konten file `.ini` Anda di bawah ini, atau unggah file
-          langsung dari komputer Anda.
-        </p>
+      <header class="text-center mb-8 fade-in">
+        <div class="glass-bg p-8 mb-6">
+          <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
+            <span
+              class="bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent"
+            >
+              Speeduino INI
+            </span>
+            <span class="text-white">Parser</span>
+          </h1>
+          <p class="text-lg text-white/80 max-w-2xl mx-auto leading-relaxed">
+            Transform your Speeduino configuration files into beautiful,
+            interactive JSON trees. Drag & drop, paste, or upload your
+            <code>.ini</code> files.
+          </p>
+
+          <!-- Stats Row -->
+          <div class="grid grid-cols-3 gap-4 mt-6 max-w-md mx-auto">
+            <div class="stats-card">
+              <div class="stats-number" id="files-processed">0</div>
+              <div class="stats-label">Files Processed</div>
+            </div>
+            <div class="stats-card">
+              <div class="stats-number" id="total-keys">0</div>
+              <div class="stats-label">Total Keys</div>
+            </div>
+            <div class="stats-card">
+              <div class="stats-number" id="parse-time">0ms</div>
+              <div class="stats-label">Parse Time</div>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main class="grid grid-cols-1 xl:grid-cols-2 gap-8">
         <!-- Input Area -->
-        <div class="bg-white p-6 rounded-xl shadow-lg">
-          <h2 class="text-2xl font-semibold mb-4">Input Konfigurasi (.ini)</h2>
-          <textarea
-            id="iniInput"
-            class="w-full h-96 md:h-[600px] p-4 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-            placeholder="Tempelkan konten file .ini di sini..."
-          ></textarea>
+        <div class="glass-bg p-6 slide-up">
+          <div class="flex items-center justify-between mb-6">
+            <h2
+              class="text-2xl font-semibold text-white flex items-center gap-3"
+            >
+              <span class="text-2xl">📝</span>
+              Configuration Input
+            </h2>
+            <div
+              class="status-indicator status-processing"
+              id="input-status"
+              style="display: none"
+            >
+              <span
+                class="w-2 h-2 bg-current rounded-full animate-pulse"
+              ></span>
+              Ready
+            </div>
+          </div>
+
+          <!-- Drag & Drop Area -->
+          <div class="drag-drop-area mb-4" id="dragDropArea">
+            <div class="text-white/70 mb-2">
+              <span class="text-4xl mb-3 block">📁</span>
+              <p class="text-lg font-medium">Drag & Drop your .ini file here</p>
+              <p class="text-sm opacity-75">or click to browse</p>
+            </div>
+          </div>
+
+          <div class="relative">
+            <textarea
+              id="iniInput"
+              class="w-full h-96 lg:h-[500px] p-4 modern-input font-mono text-sm resize-none"
+              placeholder="Paste your .ini file content here, or use drag & drop above..."
+            ></textarea>
+
+            <!-- Character count -->
+            <div
+              class="absolute bottom-2 right-2 text-xs text-gray-500 bg-white/80 px-2 py-1 rounded"
+              id="char-count"
+            >
+              0 characters
+            </div>
+          </div>
+
           <!-- Hidden file input -->
-          <input type="file" id="fileInput" accept=".ini" class="hidden" />
-          <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              id="uploadButton"
-              class="w-full bg-gray-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition duration-300 ease-in-out"
-            >
-              Unggah File .ini
+          <input
+            type="file"
+            id="fileInput"
+            accept=".ini,.txt"
+            class="hidden"
+            multiple
+          />
+
+          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="tooltip">
+              <button id="uploadButton" class="btn-secondary w-full py-3 px-4">
+                📁 Browse Files
+              </button>
+              <span class="tooltip-text"
+                >Upload .ini files from your computer</span
+              >
+            </div>
+            <div class="tooltip">
+              <button id="parseButton" class="btn-primary w-full py-3 px-4">
+                ⚡ Parse Configuration
+              </button>
+              <span class="tooltip-text"
+                >Transform your .ini file into JSON tree</span
+              >
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="mt-4 flex gap-2 flex-wrap">
+            <button id="clearButton" class="btn-secondary text-xs py-2 px-3">
+              🗑️ Clear
             </button>
-            <button
-              id="parseButton"
-              class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300 ease-in-out"
-            >
-              Parse Konfigurasi
+            <button id="sampleButton" class="btn-secondary text-xs py-2 px-3">
+              📄 Load Sample
+            </button>
+            <button id="validateButton" class="btn-secondary text-xs py-2 px-3">
+              ✅ Validate
             </button>
           </div>
         </div>
 
         <!-- Output Area -->
-        <div
-          class="bg-white text-gray-800 p-6 rounded-xl shadow-lg flex flex-col"
-        >
-          <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <h2 class="text-2xl font-semibold text-gray-900">
-              Output Terstruktur (JSON Tree)
+        <div class="glass-bg text-white p-6 flex flex-col slide-up">
+          <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
+            <h2
+              class="text-2xl font-semibold text-white flex items-center gap-3"
+            >
+              <span class="text-2xl">🌳</span>
+              JSON Tree Viewer
             </h2>
-            <div class="flex items-center gap-2">
-              <button
-                id="expandButton"
-                class="bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled
-              >
-                Expand All
-              </button>
-              <button
-                id="collapseButton"
-                class="bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg hover:bg-gray-300 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled
-              >
-                Collapse All
-              </button>
-              <button
-                id="copyButton"
-                class="bg-blue-100 text-blue-700 font-semibold py-2 px-4 rounded-lg hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-blue-500 transition duration-300 ease-in-out text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled
-              >
-                Copy JSON
-              </button>
-            </div>
-          </div>
-          <div id="spinner" class="hidden text-center py-10">
-            <svg
-              class="animate-spin h-8 w-8 text-blue-600 mx-auto"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            <p id="progress-text" class="mt-2">Parsing...</p>
             <div
-              class="mt-3 w-full bg-gray-200 rounded-full h-2 hidden"
-              id="progress-bar"
+              class="status-indicator status-success"
+              id="output-status"
+              style="display: none"
             >
-              <div
-                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                id="progress-fill"
-                style="width: 0%"
-              ></div>
+              <span class="w-2 h-2 bg-current rounded-full"></span>
+              Parsed Successfully
             </div>
           </div>
+
+          <!-- Search and Controls -->
+          <div class="mb-4 space-y-3">
+            <!-- Search Box -->
+            <div class="search-container">
+              <input
+                type="text"
+                id="searchInput"
+                class="search-input"
+                placeholder="Search in JSON tree... (Enter: next, Shift+Enter: prev, Esc: clear)"
+                disabled
+              />
+              <div class="search-icon" title="Search">🔍</div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <div class="tooltip">
+                <button
+                  id="expandButton"
+                  class="btn-secondary text-sm py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  📂 Expand All
+                </button>
+                <span class="tooltip-text">Expand all JSON nodes</span>
+              </div>
+              <div class="tooltip">
+                <button
+                  id="collapseButton"
+                  class="btn-secondary text-sm py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  📁 Collapse All
+                </button>
+                <span class="tooltip-text">Collapse all JSON nodes</span>
+              </div>
+              <div class="tooltip">
+                <button
+                  id="copyButton"
+                  class="btn-secondary text-sm py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  📋 Copy JSON
+                </button>
+                <span class="tooltip-text">Copy raw JSON to clipboard</span>
+              </div>
+              <div class="tooltip">
+                <button
+                  id="downloadButton"
+                  class="btn-secondary text-sm py-2 px-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled
+                >
+                  💾 Download
+                </button>
+                <span class="tooltip-text">Download JSON file</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Loading State -->
+          <div id="spinner" class="hidden text-center py-10">
+            <div class="relative">
+              <svg
+                class="animate-spin h-12 w-12 text-white mx-auto mb-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+            <p id="progress-text" class="mt-2 text-white font-medium">
+              Parsing...
+            </p>
+            <div class="mt-4 w-full max-w-xs mx-auto">
+              <div
+                class="progress-container"
+                id="progress-bar"
+                style="display: none"
+              >
+                <div
+                  class="progress-bar"
+                  id="progress-fill"
+                  style="width: 0%"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- JSON Output -->
           <div
             id="jsonOutput"
-            class="flex-grow w-full h-96 md:h-[600px] p-4 bg-gray-50 border border-gray-200 rounded-lg overflow-auto text-sm"
+            class="flex-grow w-full h-96 lg:h-[500px] p-4 bg-black/20 backdrop-blur-sm border border-white/10 rounded-xl overflow-auto text-sm"
+            style="color: #e5e7eb"
           ></div>
+
+          <!-- Footer Info -->
+          <div
+            class="mt-4 flex justify-between items-center text-xs text-white/60"
+          >
+            <span
+              >Shortcuts: Ctrl+F (Search), Ctrl+E (Expand), Ctrl+R (Collapse) |
+              In Search: Enter (Next), Shift+Enter (Prev), Esc (Clear)</span
+            >
+            <span id="node-count">0 nodes</span>
+          </div>
         </div>
       </main>
     </div>
@@ -1221,6 +1990,97 @@
 
         let parsedJsonString = "";
         let parseTimeout = null;
+        let parsedConfig = null;
+        let filesProcessed = 0;
+
+        // Security utilities
+        function isValidUrl(string) {
+          try {
+            new URL(string);
+            return true;
+          } catch (_) {
+            return false;
+          }
+        }
+
+        function isAllowedDomain(url) {
+          const allowedDomains = [
+            "gist.githubusercontent.com",
+            "raw.githubusercontent.com",
+          ];
+          const urlObj = new URL(url);
+          return allowedDomains.includes(urlObj.hostname);
+        }
+
+        function fetchWithSecurity(url, options = {}) {
+          const timeout = options.timeout || 10000; // 10 seconds
+          const maxSize = options.maxSize || 5 * 1024 * 1024; // 5MB
+
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+            method: "GET",
+            mode: "cors",
+            cache: "no-store",
+            redirect: "follow",
+            referrerPolicy: "no-referrer",
+          })
+            .then((response) => {
+              clearTimeout(timeoutId);
+
+              if (!response.ok) {
+                throw new Error(
+                  `HTTP ${response.status}: ${response.statusText}`
+                );
+              }
+
+              const contentLength = response.headers.get("content-length");
+              if (contentLength && parseInt(contentLength) > maxSize) {
+                throw new Error(`Content too large: ${contentLength} bytes`);
+              }
+
+              return response.text().then((text) => {
+                if (text.length > maxSize) {
+                  throw new Error(`Content too large: ${text.length} bytes`);
+                }
+                return text;
+              });
+            })
+            .catch((error) => {
+              clearTimeout(timeoutId);
+              if (error.name === "AbortError") {
+                throw new Error("Request timeout");
+              }
+              throw error;
+            });
+        }
+
+        function sanitizeInput(input) {
+          if (typeof input !== "string") {
+            return "";
+          }
+
+          // Remove potential script tags and other dangerous elements
+          const sanitized = input
+            .replace(/<script[^>]*>.*?<\/script>/gis, "")
+            .replace(/<iframe[^>]*>.*?<\/iframe>/gis, "")
+            .replace(/<object[^>]*>.*?<\/object>/gis, "")
+            .replace(/<embed[^>]*>.*?<\/embed>/gis, "")
+            .replace(/javascript:/gi, "")
+            .replace(/vbscript:/gi, "")
+            .replace(/on\w+\s*=/gi, "");
+
+          // Limit size
+          const maxLength = 10 * 1024 * 1024; // 10MB
+          if (sanitized.length > maxLength) {
+            throw new Error(`Input too large: ${sanitized.length} characters`);
+          }
+
+          return sanitized;
+        }
 
         // Debounced parse function
         function debouncedParse() {
@@ -1232,48 +2092,528 @@
           }, 1000); // Wait 1 second after user stops typing
         }
 
-        // Pre-fill the textarea with the provided config for convenience
-        fetch(
-          "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini"
-        )
-          .then((response) => response.text())
-          .then((text) => {
-            iniInput.value = text;
+        // Character count functionality
+        function updateCharCount() {
+          const charCount = document.getElementById("char-count");
+          const length = iniInput.value.length;
+          charCount.textContent = `${length.toLocaleString()} characters`;
+
+          if (length > 100000) {
+            charCount.style.color = "#ef4444";
+          } else if (length > 50000) {
+            charCount.style.color = "#f59e0b";
+          } else {
+            charCount.style.color = "#6b7280";
+          }
+        }
+
+        // Update stats
+        function updateStats(config) {
+          document.getElementById("files-processed").textContent =
+            ++filesProcessed;
+
+          let totalKeys = 0;
+          const countKeys = (obj) => {
+            if (typeof obj === "object" && obj !== null) {
+              totalKeys += Object.keys(obj).length;
+              Object.values(obj).forEach(countKeys);
+            }
+          };
+          countKeys(config);
+          document.getElementById("total-keys").textContent =
+            totalKeys.toLocaleString();
+        }
+
+        // Search functionality with improved contrast and navigation
+        function setupSearch() {
+          const searchInput = document.getElementById("searchInput");
+          const jsonOutput = document.getElementById("jsonOutput");
+          let currentSearchResults = [];
+          let currentSearchIndex = -1;
+
+          // Create search navigation buttons
+          const searchNav = document.createElement("div");
+          searchNav.className = "search-navigation hidden";
+          searchNav.innerHTML = `
+            <div class="flex items-center gap-2 text-xs text-white/70">
+              <button id="prevResult" class="btn-secondary text-xs px-2 py-1">↑</button>
+              <span id="searchCounter">0 / 0</span>
+              <button id="nextResult" class="btn-secondary text-xs px-2 py-1">↓</button>
+            </div>
+          `;
+          searchInput.parentElement.appendChild(searchNav);
+
+          const prevBtn = searchNav.querySelector("#prevResult");
+          const nextBtn = searchNav.querySelector("#nextResult");
+          const counter = searchNav.querySelector("#searchCounter");
+
+          function clearSearch() {
+            // Remove all highlights
+            jsonOutput
+              .querySelectorAll(".search-highlight, .search-current")
+              .forEach((el) => {
+                el.classList.remove("search-highlight", "search-current");
+              });
+            currentSearchResults = [];
+            currentSearchIndex = -1;
+            searchNav.classList.add("hidden");
+          }
+
+          function highlightText(element, query) {
+            const text = element.textContent;
+            const lowerText = text.toLowerCase();
+            const lowerQuery = query.toLowerCase();
+
+            if (!lowerText.includes(lowerQuery)) return;
+
+            let highlightedHTML = "";
+            let lastIndex = 0;
+            let index = lowerText.indexOf(lowerQuery);
+
+            while (index !== -1) {
+              // Add text before match
+              highlightedHTML += text.substring(lastIndex, index);
+              // Add highlighted match
+              highlightedHTML += `<mark class="search-highlight">${text.substring(
+                index,
+                index + query.length
+              )}</mark>`;
+
+              lastIndex = index + query.length;
+              index = lowerText.indexOf(lowerQuery, lastIndex);
+            }
+
+            // Add remaining text
+            highlightedHTML += text.substring(lastIndex);
+            element.innerHTML = highlightedHTML;
+
+            // Store reference to highlighted elements
+            element
+              .querySelectorAll(".search-highlight")
+              .forEach((highlight) => {
+                currentSearchResults.push({
+                  element: highlight,
+                  node: element.closest(".json-node"),
+                });
+              });
+          }
+
+          function navigateToResult(index) {
+            if (currentSearchResults.length === 0) return;
+
+            // Remove current highlight
+            currentSearchResults.forEach((result) => {
+              result.element.classList.remove("search-current");
+            });
+
+            // Update index
+            currentSearchIndex = index;
+            if (currentSearchIndex >= currentSearchResults.length)
+              currentSearchIndex = 0;
+            if (currentSearchIndex < 0)
+              currentSearchIndex = currentSearchResults.length - 1;
+
+            // Highlight current result
+            const currentResult = currentSearchResults[currentSearchIndex];
+            currentResult.element.classList.add("search-current");
+
+            // Expand parent nodes if collapsed
+            let parent = currentResult.node;
+            while (parent) {
+              const children = parent.querySelector(".json-children");
+              const toggle = parent.querySelector(".json-toggle");
+
+              if (children && !children.classList.contains("expanded")) {
+                children.classList.add("expanded");
+                toggle.classList.remove("collapsed");
+                toggle.classList.add("expanded");
+              }
+
+              parent = parent.parentElement?.closest(".json-node");
+            }
+
+            // Scroll to result with smooth behavior
+            currentResult.element.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "nearest",
+            });
+
+            // Update counter
+            counter.textContent = `${currentSearchIndex + 1} / ${
+              currentSearchResults.length
+            }`;
+          }
+
+          // Search input handler
+          searchInput.addEventListener("input", (e) => {
+            const query = e.target.value.trim();
+
+            clearSearch();
+
+            if (query === "") {
+              // Restore original text content
+              jsonOutput
+                .querySelectorAll(".json-key, .json-value")
+                .forEach((node) => {
+                  if (node.querySelector("mark")) {
+                    node.textContent = node.textContent; // This removes HTML tags
+                  }
+                });
+              return;
+            }
+
+            // Search and highlight
+            const nodes = jsonOutput.querySelectorAll(".json-key, .json-value");
+            nodes.forEach((node) => {
+              // First restore original text if it was previously highlighted
+              if (node.querySelector("mark")) {
+                node.textContent = node.textContent;
+              }
+
+              const text = node.textContent.toLowerCase();
+              if (text.includes(query.toLowerCase())) {
+                highlightText(node, query);
+              }
+            });
+
+            if (currentSearchResults.length > 0) {
+              searchNav.classList.remove("hidden");
+              navigateToResult(0);
+            }
           });
+
+          // Navigation handlers
+          prevBtn.addEventListener("click", () => {
+            navigateToResult(currentSearchIndex - 1);
+          });
+
+          nextBtn.addEventListener("click", () => {
+            navigateToResult(currentSearchIndex + 1);
+          });
+
+          // Keyboard navigation
+          searchInput.addEventListener("keydown", (e) => {
+            if (currentSearchResults.length === 0) return;
+
+            if (e.key === "Enter") {
+              e.preventDefault();
+              navigateToResult(
+                e.shiftKey ? currentSearchIndex - 1 : currentSearchIndex + 1
+              );
+            } else if (e.key === "Escape") {
+              searchInput.value = "";
+              clearSearch();
+              jsonOutput
+                .querySelectorAll(".json-key, .json-value")
+                .forEach((node) => {
+                  if (node.querySelector("mark")) {
+                    node.textContent = node.textContent;
+                  }
+                });
+            }
+          });
+        }
+
+        // Download functionality
+        function downloadJSON() {
+          if (!parsedJsonString) return;
+
+          const blob = new Blob([parsedJsonString], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `speeduino-config-${new Date()
+            .toISOString()
+            .slice(0, 10)}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          showNotification("JSON file downloaded!", "success");
+        }
+
+        // Notification system
+        function showNotification(message, type = "info") {
+          const notification = document.createElement("div");
+          notification.className = `fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-3 rounded-lg font-medium text-white transition-all duration-300 ${
+            type === "success"
+              ? "bg-green-500"
+              : type === "error"
+              ? "bg-red-500"
+              : "bg-blue-500"
+          }`;
+          notification.textContent = message;
+          notification.style.transform = "translate(-50%, -100px)";
+
+          document.body.appendChild(notification);
+
+          setTimeout(() => {
+            notification.style.transform = "translate(-50%, 0)";
+          }, 100);
+
+          setTimeout(() => {
+            notification.style.transform = "translate(-50%, -100px)";
+            setTimeout(() => {
+              if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+              }
+            }, 300);
+          }, 3000);
+        }
+
+        // Keyboard shortcuts
+        function setupKeyboardShortcuts() {
+          document.addEventListener("keydown", (e) => {
+            if (e.ctrlKey || e.metaKey) {
+              switch (e.key) {
+                case "f":
+                  e.preventDefault();
+                  document.getElementById("searchInput").focus();
+                  break;
+                case "e":
+                  e.preventDefault();
+                  if (!document.getElementById("expandButton").disabled) {
+                    document.getElementById("expandButton").click();
+                  }
+                  break;
+                case "r":
+                  e.preventDefault();
+                  if (!document.getElementById("collapseButton").disabled) {
+                    document.getElementById("collapseButton").click();
+                  }
+                  break;
+              }
+            }
+          });
+        }
+
+        // Drag and drop functionality
+        function setupDragDrop() {
+          const dragDropArea = document.getElementById("dragDropArea");
+          const fileInput = document.getElementById("fileInput");
+
+          dragDropArea.addEventListener("click", () => {
+            fileInput.click();
+          });
+
+          dragDropArea.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            dragDropArea.classList.add("drag-over");
+          });
+
+          dragDropArea.addEventListener("dragleave", (e) => {
+            e.preventDefault();
+            if (!dragDropArea.contains(e.relatedTarget)) {
+              dragDropArea.classList.remove("drag-over");
+            }
+          });
+
+          dragDropArea.addEventListener("drop", (e) => {
+            e.preventDefault();
+            dragDropArea.classList.remove("drag-over");
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+              handleFiles(files);
+            }
+          });
+        }
+
+        // Handle multiple files
+        function handleFiles(files) {
+          Array.from(files).forEach((file, index) => {
+            if (
+              file.type === "text/plain" ||
+              file.name.endsWith(".ini") ||
+              file.name.endsWith(".txt")
+            ) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                try {
+                  const sanitizedContent = sanitizeInput(e.target.result);
+                  if (index === 0) {
+                    iniInput.value = sanitizedContent;
+                  } else {
+                    iniInput.value += "\n\n" + sanitizedContent;
+                  }
+                  updateCharCount();
+
+                  if (index === files.length - 1) {
+                    setTimeout(() => parseButton.click(), 100);
+                  }
+                } catch (error) {
+                  showNotification(
+                    `File "${file.name}" content error: ${error.message}`,
+                    "error"
+                  );
+                }
+              };
+              reader.onerror = () => {
+                showNotification(`Failed to read file "${file.name}"`, "error");
+              };
+              reader.readAsText(file);
+            } else {
+              showNotification(
+                `File "${file.name}" is not a valid .ini file`,
+                "error"
+              );
+            }
+          });
+        }
+
+        // Initialize with welcome message
+        jsonOutput.innerHTML =
+          '<div class="text-center text-white/60 py-8"><span class="text-4xl mb-4 block">🌟</span><h3 class="text-lg font-semibold mb-2">Welcome to Speeduino INI Parser</h3><p>Upload a .ini file, paste content, or load a sample to get started!</p></div>';
 
         parseButton.addEventListener("click", () => {
           const iniContent = iniInput.value;
           if (!iniContent) {
             jsonOutput.innerHTML =
-              '<span class="text-gray-400">Silakan tempelkan konten .ini terlebih dahulu.</span>';
+              '<div class="text-center text-white/60 py-8"><span class="text-4xl mb-4 block">📄</span><p>Please paste your .ini content or drag & drop a file to get started.</p></div>';
             return;
           }
 
+          // Sanitize input before processing
+          let sanitizedContent;
+          try {
+            sanitizedContent = sanitizeInput(iniContent);
+          } catch (error) {
+            jsonOutput.innerHTML = `<div class="text-center text-red-400 py-8">
+              <span class="text-4xl mb-4 block">🚫</span>
+              <h3 class="text-lg font-semibold mb-2">Input Error</h3>
+              <p class="text-sm">${error.message}</p>
+            </div>`;
+            showNotification(
+              "Input validation failed: " + error.message,
+              "error"
+            );
+            return;
+          }
+
+          const startTime = performance.now();
+
+          // Update UI state
           jsonOutput.innerHTML = "";
           spinner.classList.remove("hidden");
           copyButton.disabled = true;
           document.getElementById("expandButton").disabled = true;
           document.getElementById("collapseButton").disabled = true;
+          document.getElementById("downloadButton").disabled = true;
+          document.getElementById("searchInput").disabled = true;
+
+          // Update status
+          document.getElementById("input-status").style.display = "flex";
+          document.getElementById("input-status").textContent = "Processing...";
+          document.getElementById("input-status").className =
+            "status-indicator status-processing";
+
           parsedJsonString = ""; // Reset on new parse
 
           setTimeout(() => {
             try {
               const parser = new SpeeduinoIniParser();
-              const config = parser.parse(iniContent);
+              const config = parser.parse(sanitizedContent);
+              parsedConfig = config;
               parsedJsonString = JSON.stringify(config, null, 2);
+
+              const endTime = performance.now();
+              const parseTime = Math.round(endTime - startTime);
+              document.getElementById(
+                "parse-time"
+              ).textContent = `${parseTime}ms`;
+
+              // Update stats
+              updateStats(config);
+
+              // Enable controls
               copyButton.disabled = false;
               document.getElementById("expandButton").disabled = false;
               document.getElementById("collapseButton").disabled = false;
+              document.getElementById("downloadButton").disabled = false;
+              document.getElementById("searchInput").disabled = false;
+
+              // Update status
+              document.getElementById("input-status").textContent = "Completed";
+              document.getElementById("input-status").className =
+                "status-indicator status-success";
+              document.getElementById("output-status").style.display = "flex";
 
               // Render the JSON Tree with batching
               jsonOutput.innerHTML = ""; // Clear previous content
               renderJsonTreeAsync(config, jsonOutput).then(() => {
                 spinner.classList.add("hidden");
+                setupSearch();
+                updateNodeCount();
+                showNotification(
+                  "Configuration parsed successfully!",
+                  "success"
+                );
               });
             } catch (error) {
-              jsonOutput.textContent = `Terjadi kesalahan saat parsing:\n${error.stack}`;
-              console.error("Parsing Error:", error);
+              // Enhanced error boundary with error reporting
+              const errorId = "ERR_" + Date.now();
+              const errorDetails = {
+                id: errorId,
+                message: error.message,
+                stack: error.stack,
+                timestamp: new Date().toISOString(),
+                inputLength: sanitizedContent?.length || 0,
+                userAgent: navigator.userAgent,
+              };
+
+              // Log error details for debugging
+              console.error("Parsing Error:", errorDetails);
+
+              // Display user-friendly error
+              const safeErrorMessage = error.message
+                .replace(/<[^>]*>/g, "") // Remove any HTML tags
+                .substring(0, 200); // Limit length
+
+              jsonOutput.innerHTML = `<div class="text-center text-red-400 py-8">
+                <span class="text-4xl mb-4 block">❌</span>
+                <h3 class="text-lg font-semibold mb-2">Parsing Error</h3>
+                <p class="text-sm mb-4">${safeErrorMessage}</p>
+                <div class="text-xs text-white/60 mb-4">Error ID: ${errorId}</div>
+                <details class="mt-4 text-xs text-left">
+                  <summary class="cursor-pointer text-blue-300 hover:text-blue-100">
+                    Show Technical Details
+                  </summary>
+                  <div class="mt-2 p-3 bg-black/30 rounded border border-white/10">
+                    <div><strong>Time:</strong> ${errorDetails.timestamp}</div>
+                    <div><strong>Input Size:</strong> ${errorDetails.inputLength} characters</div>
+                    <div class="mt-2"><strong>Stack Trace:</strong></div>
+                    <pre class="mt-1 text-xs overflow-auto max-h-32">${error.stack}</pre>
+                  </div>
+                </details>
+                <div class="mt-4">
+                  <button onclick="location.reload()" 
+                          class="btn-secondary text-xs py-2 px-3">
+                    🔄 Refresh Page
+                  </button>
+                </div>
+              </div>`;
+
+              // Update status
+              document.getElementById("input-status").textContent = "Error";
+              document.getElementById("input-status").className =
+                "status-indicator status-error";
+
+              // Reset UI state
               spinner.classList.add("hidden");
+              copyButton.disabled = true;
+              document.getElementById("expandButton").disabled = true;
+              document.getElementById("collapseButton").disabled = true;
+              document.getElementById("downloadButton").disabled = true;
+              document.getElementById("searchInput").disabled = true;
+
+              showNotification(
+                `Parsing failed (${errorId}): ${safeErrorMessage}`,
+                "error"
+              );
             }
           }, 50);
         });
@@ -1282,24 +2622,159 @@
           fileInput.click();
         });
 
+        // Initialize all features
+        setupDragDrop();
+        setupKeyboardShortcuts();
+
+        // Set mobile-friendly placeholder
+        function updateSearchPlaceholder() {
+          const searchInput = document.getElementById("searchInput");
+          if (window.innerWidth < 768) {
+            searchInput.placeholder =
+              "Search JSON... (Enter: next, Esc: clear)";
+          } else {
+            searchInput.placeholder =
+              "Search in JSON tree... (Enter: next, Shift+Enter: prev, Esc: clear)";
+          }
+        }
+
+        updateSearchPlaceholder();
+        window.addEventListener("resize", updateSearchPlaceholder);
+
+        // Set mobile-friendly footer shortcuts
+        function updateFooterShortcuts() {
+          const footerShortcuts = document.querySelector(
+            ".mt-4.flex.justify-between span"
+          );
+          if (window.innerWidth < 768) {
+            footerShortcuts.innerHTML =
+              "Ctrl+F: Search | Ctrl+E: Expand | Ctrl+R: Collapse";
+          } else {
+            footerShortcuts.innerHTML =
+              "Shortcuts: Ctrl+F (Search), Ctrl+E (Expand), Ctrl+R (Collapse) | In Search: Enter (Next), Shift+Enter (Prev), Esc (Clear)";
+          }
+        }
+
+        updateFooterShortcuts();
+        window.addEventListener("resize", updateFooterShortcuts);
+
         // Auto-parse on input change with debouncing
         iniInput.addEventListener("input", () => {
+          updateCharCount();
           if (iniInput.value.trim()) {
             debouncedParse();
           }
         });
 
+        // Initial character count
+        updateCharCount();
+
+        // File input handler
         fileInput.addEventListener("change", (event) => {
-          const file = event.target.files[0];
-          if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              iniInput.value = e.target.result;
-              parseButton.click();
-            };
-            reader.readAsText(file);
+          const files = event.target.files;
+          if (files.length > 0) {
+            handleFiles(files);
           }
         });
+
+        // Download button
+        document
+          .getElementById("downloadButton")
+          .addEventListener("click", downloadJSON);
+
+        // Clear button
+        document.getElementById("clearButton").addEventListener("click", () => {
+          iniInput.value = "";
+          updateCharCount();
+          jsonOutput.innerHTML =
+            '<div class="text-center text-white/60 py-8"><span class="text-4xl mb-4 block">📄</span><p>Content cleared. Ready for new input.</p></div>';
+
+          // Reset UI state
+          document.getElementById("input-status").style.display = "none";
+          document.getElementById("output-status").style.display = "none";
+          document.getElementById("searchInput").value = "";
+          document.getElementById("searchInput").disabled = true;
+
+          // Reset stats
+          document.getElementById("total-keys").textContent = "0";
+          document.getElementById("parse-time").textContent = "0ms";
+          document.getElementById("node-count").textContent = "0 nodes";
+
+          showNotification("Content cleared", "info");
+        });
+
+        // Sample button
+        document
+          .getElementById("sampleButton")
+          .addEventListener("click", () => {
+            // Pre-fill with sample data if no external source
+            if (iniInput.value.trim() === "") {
+              showNotification("Loading sample configuration...", "info");
+
+              // Secure fetch with validation
+              const sampleUrl =
+                "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini";
+
+              // Validate URL
+              if (!isValidUrl(sampleUrl) || !isAllowedDomain(sampleUrl)) {
+                showNotification("Invalid or unauthorized URL", "error");
+                return;
+              }
+
+              // Fetch with timeout and size limits
+              fetchWithSecurity(sampleUrl)
+                .then((text) => {
+                  const sanitizedText = sanitizeInput(text);
+                  iniInput.value = sanitizedText;
+                  updateCharCount();
+                  parseButton.click();
+                })
+                .catch((error) => {
+                  console.error("Fetch error:", error);
+                  showNotification(
+                    "Failed to load sample file: " + error.message,
+                    "error"
+                  );
+                });
+            } else {
+              showNotification("Clear current content first", "info");
+            }
+          });
+
+        // Validate button
+        document
+          .getElementById("validateButton")
+          .addEventListener("click", () => {
+            const content = iniInput.value.trim();
+            if (!content) {
+              showNotification("No content to validate", "info");
+              return;
+            }
+
+            // Basic validation
+            const lines = content.split("\n");
+            const sections = lines.filter((line) =>
+              line.trim().match(/^\[.+\]$/)
+            );
+            const keyValuePairs = lines.filter((line) =>
+              line.trim().match(/^[\w\.]+\s*=\s*.+$/)
+            );
+
+            showNotification(
+              `Found ${sections.length} sections and ${keyValuePairs.length} key-value pairs`,
+              "success"
+            );
+          });
+
+        // Update node count function
+        function updateNodeCount() {
+          setTimeout(() => {
+            const nodes = document.querySelectorAll(".json-node");
+            document.getElementById(
+              "node-count"
+            ).textContent = `${nodes.length} nodes`;
+          }, 100);
+        }
 
         copyButton.addEventListener("click", () => {
           if (!parsedJsonString) return;
