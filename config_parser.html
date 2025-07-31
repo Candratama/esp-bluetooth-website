@@ -853,16 +853,14 @@
             multiple
           />
 
-          <div class="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="mt-6 flex gap-2 items-center">
             <div class="tooltip">
-              <button id="uploadButton" class="btn-secondary w-full py-3 px-4">
-                📁 Browse Files
+              <button id="clearButton" class="btn-secondary text-xs py-3 px-3">
+                🗑️
               </button>
-              <span class="tooltip-text"
-                >Upload .ini files from your computer</span
-              >
+              <span class="tooltip-text">Clear current content</span>
             </div>
-            <div class="tooltip">
+            <div class="tooltip flex-1">
               <button id="parseButton" class="btn-primary w-full py-3 px-4">
                 ⚡ Parse Configuration
               </button>
@@ -870,19 +868,6 @@
                 >Transform your .ini file into JSON tree</span
               >
             </div>
-          </div>
-
-          <!-- Quick Actions -->
-          <div class="mt-4 flex gap-2 flex-wrap">
-            <button id="clearButton" class="btn-secondary text-xs py-2 px-3">
-              🗑️ Clear
-            </button>
-            <button id="sampleButton" class="btn-secondary text-xs py-2 px-3">
-              📄 Load Sample
-            </button>
-            <button id="validateButton" class="btn-secondary text-xs py-2 px-3">
-              ✅ Validate
-            </button>
           </div>
         </div>
 
@@ -1971,7 +1956,6 @@
         const jsonOutput = document.getElementById("jsonOutput");
         const spinner = document.getElementById("spinner");
         const copyButton = document.getElementById("copyButton");
-        const uploadButton = document.getElementById("uploadButton");
         const fileInput = document.getElementById("fileInput");
 
         let parsedJsonString = "";
@@ -2445,10 +2429,6 @@
           }, 50);
         });
 
-        uploadButton.addEventListener("click", () => {
-          fileInput.click();
-        });
-
         // Initialize all features
         setupDragDrop();
         setupKeyboardShortcuts();
@@ -2529,56 +2509,6 @@
 
           showNotification("Content cleared", "info");
         });
-
-        // Sample button
-        document
-          .getElementById("sampleButton")
-          .addEventListener("click", () => {
-            // Pre-fill with sample data if no external source
-            if (iniInput.value.trim() === "") {
-              showNotification("Loading sample configuration...", "info");
-              // Load the external sample
-              fetch(
-                "https://gist.githubusercontent.com/losh11/b47a036c53552816b3f3a59800c25c20/raw/e437512f451375d315181b538dc3735111116666/speeduino.ini"
-              )
-                .then((response) => response.text())
-                .then((text) => {
-                  iniInput.value = text;
-                  updateCharCount();
-                  parseButton.click();
-                })
-                .catch(() => {
-                  showNotification("Failed to load sample file", "error");
-                });
-            } else {
-              showNotification("Clear current content first", "info");
-            }
-          });
-
-        // Validate button
-        document
-          .getElementById("validateButton")
-          .addEventListener("click", () => {
-            const content = iniInput.value.trim();
-            if (!content) {
-              showNotification("No content to validate", "info");
-              return;
-            }
-
-            // Basic validation
-            const lines = content.split("\n");
-            const sections = lines.filter((line) =>
-              line.trim().match(/^\[.+\]$/)
-            );
-            const keyValuePairs = lines.filter((line) =>
-              line.trim().match(/^[\w\.]+\s*=\s*.+$/)
-            );
-
-            showNotification(
-              `Found ${sections.length} sections and ${keyValuePairs.length} key-value pairs`,
-              "success"
-            );
-          });
 
         // Update node count function
         function updateNodeCount() {
