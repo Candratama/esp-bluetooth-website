@@ -1123,6 +1123,12 @@
                 Tools: () => ({ tools: [] }),
                 VeAnalyze: () => ({ filters: [] }),
                 WueAnalyze: () => ({ filters: [] }),
+                Application: () => ({}),
+                PcVariables: () => ({}),
+                Functions: () => ({}),
+                Command: () => ({}),
+                DefaultMenu: () => ({}),
+                DefaultDefined: () => ({ dialogs: {} }),
               };
 
               if (sectionInitializers[this.currentSection]) {
@@ -1166,6 +1172,12 @@
                 VeAnalyze: this.handleAnalyzeParsing,
                 WueAnalyze: this.handleAnalyzeParsing,
                 SettingGroups: this.handleSettingGroups,
+                Application: this.handleApplication,
+                PcVariables: this.handlePcVariables,
+                Functions: this.handleFunctions,
+                Command: this.handleCommand,
+                DefaultMenu: this.handleMenuParsing,
+                DefaultDefined: this.handleUserDefinedParsing,
               };
 
               if (handlers[this.currentSection]) {
@@ -1448,6 +1460,14 @@
         }
 
         handleUserDefinedParsing(key, value, comment) {
+          // Ensure section is properly initialized
+          if (!this.config[this.currentSection]) {
+            this.config[this.currentSection] = { dialogs: {} };
+          }
+          if (!this.config[this.currentSection].dialogs) {
+            this.config[this.currentSection].dialogs = {};
+          }
+
           const parts = this.splitRespectingQuotes(value);
           let element = null;
 
@@ -1461,7 +1481,7 @@
                 content: [],
               };
               if (comment) this.currentUserDefinedDialog.comment = comment;
-              this.config.UserDefined.dialogs[dialogId] =
+              this.config[this.currentSection].dialogs[dialogId] =
                 this.currentUserDefinedDialog;
               this.lastUserDefinedElement = this.currentUserDefinedDialog;
               break;
@@ -1690,12 +1710,17 @@
         }
 
         handleMenuParsing(key, value, comment) {
+          // Ensure section is properly initialized
+          if (!this.config[this.currentSection]) {
+            this.config[this.currentSection] = {};
+          }
+
           const parts = this.splitRespectingQuotes(value);
           switch (key) {
             case "menuDialog":
               this.currentMenuDialog = value;
-              this.config.Menu[this.currentMenuDialog] =
-                this.config.Menu[this.currentMenuDialog] || [];
+              this.config[this.currentSection][this.currentMenuDialog] =
+                this.config[this.currentSection][this.currentMenuDialog] || [];
               this.currentMenu = null;
               this.currentGroupMenu = null;
               break;
@@ -1707,7 +1732,9 @@
                 items: [],
               };
               if (comment) this.currentMenu.comment = comment;
-              this.config.Menu[this.currentMenuDialog].push(this.currentMenu);
+              this.config[this.currentSection][this.currentMenuDialog].push(
+                this.currentMenu
+              );
               this.currentGroupMenu = null;
               break;
             case "subMenu":
@@ -1944,6 +1971,50 @@
             return part; // Store expression as string
           }
           return parseFloat(part);
+        }
+
+        handleApplication(key, value, comment) {
+          const parsedValue = this.parseLine(key, value);
+          if (
+            comment &&
+            typeof parsedValue === "object" &&
+            parsedValue !== null &&
+            !Array.isArray(parsedValue)
+          ) {
+            parsedValue.comment = comment;
+          }
+          this.config.Application[key] = parsedValue;
+        }
+
+        handlePcVariables(key, value, comment) {
+          const parsedValue = this.parseLine(key, value);
+          if (
+            comment &&
+            typeof parsedValue === "object" &&
+            parsedValue !== null &&
+            !Array.isArray(parsedValue)
+          ) {
+            parsedValue.comment = comment;
+          }
+          this.config.PcVariables[key] = parsedValue;
+        }
+
+        handleFunctions(key, value, comment) {
+          // Functions can contain expressions and calculations
+          const processedValue = value.replace(/^"|"$/g, ""); // Remove quotes
+          const entry = { expression: processedValue };
+          if (comment) entry.comment = comment;
+          this.config.Functions[key] = entry;
+        }
+
+        handleCommand(key, value, comment) {
+          const parts = this.splitRespectingQuotes(value);
+          const entry = {
+            command: parts[0],
+            parameters: parts.slice(1),
+          };
+          if (comment) entry.comment = comment;
+          this.config.Command[key] = entry;
         }
       }
 
