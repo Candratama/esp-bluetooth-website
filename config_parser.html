@@ -1105,30 +1105,26 @@
               this.currentReferenceTable = null;
 
               const sectionInitializers = {
-                ConstantsExtensions: () => ({
-                  requiresPowerCycle: [],
-                  defaultValue: {},
-                  controllerPriority: [],
-                }),
-                UserDefined: () => ({ dialogs: {} }),
+                ConstantsExtensions: () => ({}),
+                UserDefined: () => ({}),
                 Menu: () => ({}),
                 CurveEditor: () => ({}),
                 TableEditor: () => ({}),
                 GaugeConfigurations: () => ({}),
-                FrontPage: () => ({ gauges: {}, indicators: [] }),
-                Constants: () => ({ pages: {} }),
-                Datalog: () => ({ entries: [] }),
+                FrontPage: () => ({}),
+                Constants: () => ({}),
+                Datalog: () => ({}),
                 LoggerDefinition: () => ({}),
-                ReferenceTables: () => ({ tables: {} }),
-                Tools: () => ({ tools: [] }),
-                VeAnalyze: () => ({ filters: [] }),
-                WueAnalyze: () => ({ filters: [] }),
+                ReferenceTables: () => ({}),
+                Tools: () => ({}),
+                VeAnalyze: () => ({}),
+                WueAnalyze: () => ({}),
                 Application: () => ({}),
                 PcVariables: () => ({}),
                 Functions: () => ({}),
                 Command: () => ({}),
                 DefaultMenu: () => ({}),
-                DefaultDefined: () => ({ dialogs: {} }),
+                DefaultDefined: () => ({}),
               };
 
               if (sectionInitializers[this.currentSection]) {
@@ -1144,6 +1140,10 @@
             const pageMatch = trimmedLine.match(/^page\s*=\s*(\d+)/i);
             if (pageMatch && this.currentSection === "Constants") {
               currentPage = pageMatch[1];
+              // Create pages object only if it doesn't exist
+              if (!this.config.Constants.pages) {
+                this.config.Constants.pages = {};
+              }
               this.config.Constants.pages[currentPage] =
                 this.config.Constants.pages[currentPage] || {};
               continue;
@@ -1206,6 +1206,13 @@
                 }
 
                 if (this.currentSection === "Constants" && currentPage) {
+                  // Ensure pages object exists before using it
+                  if (!this.config.Constants.pages) {
+                    this.config.Constants.pages = {};
+                  }
+                  if (!this.config.Constants.pages[currentPage]) {
+                    this.config.Constants.pages[currentPage] = {};
+                  }
                   this.config.Constants.pages[currentPage][key] = parsedValue;
                 } else {
                   this.config[this.currentSection][key] = parsedValue;
@@ -1218,8 +1225,16 @@
 
         handleFrontPageParsing(key, value, comment) {
           if (key.startsWith("gauge")) {
+            // Create gauges object only if it doesn't exist
+            if (!this.config.FrontPage.gauges) {
+              this.config.FrontPage.gauges = {};
+            }
             this.config.FrontPage.gauges[key] = value;
           } else if (key === "indicator") {
+            // Create indicators array only if it doesn't exist
+            if (!this.config.FrontPage.indicators) {
+              this.config.FrontPage.indicators = [];
+            }
             const parts = this.splitRespectingQuotes(value);
             const indicator = {
               expression: parts[0],
@@ -1269,6 +1284,10 @@
 
         handleDatalogParsing(key, value, comment) {
           if (key === "entry") {
+            // Create entries array only if it doesn't exist
+            if (!this.config.Datalog.entries) {
+              this.config.Datalog.entries = [];
+            }
             const parts = this.splitRespectingQuotes(value);
             const entry = {
               channel: parts[0],
@@ -1290,13 +1309,15 @@
               title: title.replace(/"/g, ""),
               type,
               properties: {},
-              recordFields: [],
-              calcFields: [],
             };
             if (comment) this.currentLogger.comment = comment;
             this.config.LoggerDefinition[id] = this.currentLogger;
           } else if (this.currentLogger) {
             if (key === "recordField") {
+              // Create recordFields array only if it doesn't exist
+              if (!this.currentLogger.recordFields) {
+                this.currentLogger.recordFields = [];
+              }
               this.currentLogger.recordFields.push({
                 name: parts[0],
                 header: parts[1].replace(/"/g, ""),
@@ -1306,6 +1327,10 @@
                 units: parts[5].replace(/"/g, ""),
               });
             } else if (key === "calcField") {
+              // Create calcFields array only if it doesn't exist
+              if (!this.currentLogger.calcFields) {
+                this.currentLogger.calcFields = [];
+              }
               this.currentLogger.calcFields.push({
                 name: parts[0],
                 header: parts[1].replace(/"/g, ""),
@@ -1334,18 +1359,28 @@
             this.currentReferenceTable = {
               title: title.replace(/"/g, ""),
               properties: {},
-              generators: [],
-              solutions: [],
             };
             if (comment) this.currentReferenceTable.comment = comment;
+            // Create tables object only if it doesn't exist
+            if (!this.config.ReferenceTables.tables) {
+              this.config.ReferenceTables.tables = {};
+            }
             this.config.ReferenceTables.tables[id] = this.currentReferenceTable;
           } else if (this.currentReferenceTable) {
             if (key === "tableGenerator") {
+              // Create generators array only if it doesn't exist
+              if (!this.currentReferenceTable.generators) {
+                this.currentReferenceTable.generators = [];
+              }
               this.currentReferenceTable.generators.push({
                 type: parts[0],
                 label: parts[1].replace(/"/g, ""),
               });
             } else if (key === "thermOption" || key === "solution") {
+              // Create solutions array only if it doesn't exist
+              if (!this.currentReferenceTable.solutions) {
+                this.currentReferenceTable.solutions = [];
+              }
               this.currentReferenceTable.solutions.push({
                 name: parts[0].replace(/"/g, ""),
                 value: parts.slice(1).join(", "),
@@ -1376,6 +1411,10 @@
 
         handleToolsParsing(key, value, comment) {
           if (key === "addTool") {
+            // Create tools array only if it doesn't exist
+            if (!this.config.Tools.tools) {
+              this.config.Tools.tools = [];
+            }
             const [name, panel, tableId] = this.splitRespectingQuotes(value);
             const tool = { name, panel: panel.replace(/"/g, ""), tableId };
             if (comment) tool.comment = comment;
@@ -1411,6 +1450,10 @@
           } else if (key === "lambdaTargetTables") {
             section.lambdaTargetTables = parts;
           } else if (key === "filter") {
+            // Create filters array only if it doesn't exist
+            if (!section.filters) {
+              section.filters = [];
+            }
             const filter = {
               id: parts[0],
               label: parts[1] ? parts[1].replace(/"/g, "") : null,
@@ -1426,8 +1469,16 @@
 
         handleConstantsExtensions(key, value, comment) {
           if (key === "requiresPowerCycle" || key === "controllerPriority") {
+            // Create array only if it doesn't exist
+            if (!this.config.ConstantsExtensions[key]) {
+              this.config.ConstantsExtensions[key] = [];
+            }
             this.config.ConstantsExtensions[key].push(value);
           } else if (key === "defaultValue") {
+            // Create defaultValue object only if it doesn't exist
+            if (!this.config.ConstantsExtensions.defaultValue) {
+              this.config.ConstantsExtensions.defaultValue = {};
+            }
             const [defKey, ...defValParts] = this.splitRespectingQuotes(value);
             this.config.ConstantsExtensions.defaultValue[defKey] = defValParts
               .join(", ")
@@ -1450,12 +1501,36 @@
             const [name, displayName] = this.splitRespectingQuotes(value);
             this.config.SettingGroups[name] = {
               displayName: displayName.replace(/"/g, ""),
-              options: {},
+              options: [],
             };
           } else if (key === "settingOption" && currentGroup) {
-            const [name, displayName] = this.splitRespectingQuotes(value);
-            this.config.SettingGroups[currentGroup].options[name] =
-              displayName.replace(/"/g, "");
+            const parts = this.splitRespectingQuotes(value);
+            const [id, displayName, ...extraParams] = parts;
+
+            const option = {
+              id: id.replace(/"/g, ""),
+              displayName: displayName.replace(/"/g, ""),
+              isDefault: false,
+            };
+
+            // Check for DEFAULT flag and conversion formula
+            extraParams.forEach((param, index) => {
+              const cleanParam = param.trim();
+              if (cleanParam === "DEFAULT") {
+                option.isDefault = true;
+              } else if (
+                cleanParam.startsWith("(") &&
+                cleanParam.includes("%s")
+              ) {
+                option.conversion = cleanParam;
+              }
+            });
+
+            if (comment) {
+              option.comment = comment;
+            }
+
+            this.config.SettingGroups[currentGroup].options.push(option);
           }
         }
 
